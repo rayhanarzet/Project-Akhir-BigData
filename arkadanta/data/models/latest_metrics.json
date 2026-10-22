@@ -1,0 +1,451 @@
+{
+  "trained_at": "2026-10-22T01:41:32.910587+00:00",
+  "symbol": "BTCUSDT",
+  "timeframe": "1h",
+  "target_horizon": 1,
+  "features": [
+    "max_volatility",
+    "spike_ratio",
+    "rsi_14",
+    "volume_zscore",
+    "bb_width",
+    "hl_range"
+  ],
+  "cluster_k": 3,
+  "train_ratio": 0.8,
+  "rf_num_trees": 200,
+  "rf_max_depth": 10,
+  "temporal_split": {
+    "total_samples": 166,
+    "train_samples": 132,
+    "test_samples": 34,
+    "train_start": "2026-10-15 02:00:00+00:00",
+    "train_end": "2026-10-20 13:00:00+00:00",
+    "test_start": "2026-10-20 14:00:00+00:00",
+    "test_end": "2026-10-21 23:00:00+00:00"
+  },
+  "kmeans_metrics": {
+    "silhouette_score": 0.2801,
+    "cluster_to_label": {
+      "0": "SAFE",
+      "2": "WARNING",
+      "1": "DANGER"
+    },
+    "centroids": [
+      {
+        "cluster_id": 0,
+        "risk_rank": 1,
+        "assigned_risk_label": "SAFE",
+        "composite_risk_score": -0.3228,
+        "train_sample_count": 69,
+        "centroid_max_volatility": 0.025021,
+        "z_max_volatility": -0.4857,
+        "centroid_spike_ratio": 0.631213,
+        "z_spike_ratio": -0.5181,
+        "centroid_rsi_14": 47.569375,
+        "z_rsi_14": -0.5778,
+        "centroid_volume_zscore": -0.467489,
+        "z_volume_zscore": -0.5104,
+        "centroid_bb_width": 0.113321,
+        "z_bb_width": -0.051,
+        "centroid_hl_range": 0.025021,
+        "z_hl_range": -0.4857
+      },
+      {
+        "cluster_id": 2,
+        "risk_rank": 2,
+        "assigned_risk_label": "WARNING",
+        "composite_risk_score": -0.2537,
+        "train_sample_count": 30,
+        "centroid_max_volatility": 0.02356,
+        "z_max_volatility": -0.5361,
+        "centroid_spike_ratio": 0.714493,
+        "z_spike_ratio": -0.408,
+        "centroid_rsi_14": 75.214755,
+        "z_rsi_14": 1.3166,
+        "centroid_volume_zscore": -0.306822,
+        "z_volume_zscore": -0.3483,
+        "centroid_bb_width": 0.111138,
+        "z_bb_width": -0.1181,
+        "centroid_hl_range": 0.02356,
+        "z_hl_range": -0.5361
+      },
+      {
+        "cluster_id": 1,
+        "risk_rank": 3,
+        "assigned_risk_label": "DANGER",
+        "composite_risk_score": 1.0666,
+        "train_sample_count": 34,
+        "centroid_max_volatility": 0.081461,
+        "z_max_volatility": 1.4588,
+        "centroid_spike_ratio": 2.091605,
+        "z_spike_ratio": 1.4114,
+        "centroid_rsi_14": 56.16059,
+        "z_rsi_14": 0.0109,
+        "centroid_volume_zscore": 1.36977,
+        "z_volume_zscore": 1.3432,
+        "centroid_bb_width": 0.121724,
+        "z_bb_width": 0.2076,
+        "centroid_hl_range": 0.081461,
+        "z_hl_range": 1.4588
+      }
+    ],
+    "regime_distribution": {
+      "SAFE": 96,
+      "WARNING": 30,
+      "DANGER": 41
+    }
+  },
+  "classification_metrics": {
+    "accuracy": 0.6765,
+    "precision_macro": 0.3833,
+    "recall_macro": 0.4259,
+    "f1_macro": 0.4035,
+    "per_class": {
+      "SAFE": {
+        "precision": 0.7667,
+        "recall": 0.8519,
+        "f1_score": 0.807,
+        "support": 27
+      },
+      "WARNING": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "support": 0
+      },
+      "DANGER": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "support": 7
+      }
+    },
+    "labels": [
+      "SAFE",
+      "WARNING",
+      "DANGER"
+    ],
+    "confusion_matrix": [
+      [
+        23,
+        0,
+        4
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        7,
+        0,
+        0
+      ]
+    ]
+  },
+  "regression_metrics": {
+    "mae": 0.02452,
+    "rmse": 0.02718
+  },
+  "feature_importances": [
+    {
+      "feature": "rsi_14",
+      "importance": 0.3646
+    },
+    {
+      "feature": "bb_width",
+      "importance": 0.1565
+    },
+    {
+      "feature": "spike_ratio",
+      "importance": 0.1327
+    },
+    {
+      "feature": "max_volatility",
+      "importance": 0.122
+    },
+    {
+      "feature": "volume_zscore",
+      "importance": 0.1196
+    },
+    {
+      "feature": "hl_range",
+      "importance": 0.1046
+    }
+  ],
+  "test_predictions_preview": [
+    {
+      "timestamp": "2026-10-20 14:00:00+00:00",
+      "close": 67742.0825,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.013188,
+      "predicted_vol_t1": 0.039007
+    },
+    {
+      "timestamp": "2026-10-20 15:00:00+00:00",
+      "close": 68224.182,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.010843,
+      "predicted_vol_t1": 0.036209
+    },
+    {
+      "timestamp": "2026-10-20 16:00:00+00:00",
+      "close": 68338.4908,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.015645,
+      "predicted_vol_t1": 0.032707
+    },
+    {
+      "timestamp": "2026-10-20 17:00:00+00:00",
+      "close": 68417.6511,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.085323,
+      "predicted_vol_t1": 0.043132
+    },
+    {
+      "timestamp": "2026-10-20 18:00:00+00:00",
+      "close": 66402.8996,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.052704,
+      "predicted_vol_t1": 0.081378
+    },
+    {
+      "timestamp": "2026-10-20 19:00:00+00:00",
+      "close": 65584.9059,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.045219,
+      "predicted_vol_t1": 0.035773
+    },
+    {
+      "timestamp": "2026-10-20 20:00:00+00:00",
+      "close": 66899.1741,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.028699,
+      "predicted_vol_t1": 0.030555
+    },
+    {
+      "timestamp": "2026-10-20 21:00:00+00:00",
+      "close": 66240.7319,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.079251,
+      "predicted_vol_t1": 0.033966
+    },
+    {
+      "timestamp": "2026-10-20 22:00:00+00:00",
+      "close": 63249.144,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.045026,
+      "predicted_vol_t1": 0.040135
+    },
+    {
+      "timestamp": "2026-10-20 23:00:00+00:00",
+      "close": 64704.2983,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.064222,
+      "predicted_vol_t1": 0.032883
+    },
+    {
+      "timestamp": "2026-10-21 00:00:00+00:00",
+      "close": 63791.8938,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.041535,
+      "predicted_vol_t1": 0.037258
+    },
+    {
+      "timestamp": "2026-10-21 01:00:00+00:00",
+      "close": 62562.2648,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.027285,
+      "predicted_vol_t1": 0.033778
+    },
+    {
+      "timestamp": "2026-10-21 02:00:00+00:00",
+      "close": 62697.1611,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.017357,
+      "predicted_vol_t1": 0.046647
+    },
+    {
+      "timestamp": "2026-10-21 03:00:00+00:00",
+      "close": 63042.1471,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.018671,
+      "predicted_vol_t1": 0.050545
+    },
+    {
+      "timestamp": "2026-10-21 04:00:00+00:00",
+      "close": 63516.1563,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.020422,
+      "predicted_vol_t1": 0.031034
+    },
+    {
+      "timestamp": "2026-10-21 05:00:00+00:00",
+      "close": 62967.8706,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.073194,
+      "predicted_vol_t1": 0.049206
+    },
+    {
+      "timestamp": "2026-10-21 06:00:00+00:00",
+      "close": 60122.3473,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.079627,
+      "predicted_vol_t1": 0.038839
+    },
+    {
+      "timestamp": "2026-10-21 07:00:00+00:00",
+      "close": 62497.4892,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.010201,
+      "predicted_vol_t1": 0.039548
+    },
+    {
+      "timestamp": "2026-10-21 08:00:00+00:00",
+      "close": 62435.5457,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.012157,
+      "predicted_vol_t1": 0.036092
+    },
+    {
+      "timestamp": "2026-10-21 09:00:00+00:00",
+      "close": 62502.9162,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.019992,
+      "predicted_vol_t1": 0.03879
+    },
+    {
+      "timestamp": "2026-10-21 10:00:00+00:00",
+      "close": 62743.3881,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.024764,
+      "predicted_vol_t1": 0.04782
+    },
+    {
+      "timestamp": "2026-10-21 11:00:00+00:00",
+      "close": 62533.481,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.009082,
+      "predicted_vol_t1": 0.02607
+    },
+    {
+      "timestamp": "2026-10-21 12:00:00+00:00",
+      "close": 62450.6585,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.071741,
+      "predicted_vol_t1": 0.026541
+    },
+    {
+      "timestamp": "2026-10-21 13:00:00+00:00",
+      "close": 61717.361,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.013482,
+      "predicted_vol_t1": 0.046276
+    },
+    {
+      "timestamp": "2026-10-21 14:00:00+00:00",
+      "close": 61599.9425,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.016307,
+      "predicted_vol_t1": 0.040958
+    },
+    {
+      "timestamp": "2026-10-21 15:00:00+00:00",
+      "close": 60959.9917,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.019918,
+      "predicted_vol_t1": 0.058013
+    },
+    {
+      "timestamp": "2026-10-21 16:00:00+00:00",
+      "close": 60343.5715,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.034529,
+      "predicted_vol_t1": 0.05527
+    },
+    {
+      "timestamp": "2026-10-21 17:00:00+00:00",
+      "close": 59282.1633,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.072836,
+      "predicted_vol_t1": 0.043991
+    },
+    {
+      "timestamp": "2026-10-21 18:00:00+00:00",
+      "close": 57687.3032,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.018272,
+      "predicted_vol_t1": 0.048399
+    },
+    {
+      "timestamp": "2026-10-21 19:00:00+00:00",
+      "close": 57725.3324,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.025979,
+      "predicted_vol_t1": 0.057241
+    },
+    {
+      "timestamp": "2026-10-21 20:00:00+00:00",
+      "close": 57454.8038,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.014193,
+      "predicted_vol_t1": 0.043098
+    },
+    {
+      "timestamp": "2026-10-21 21:00:00+00:00",
+      "close": 56905.9498,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.016858,
+      "predicted_vol_t1": 0.051414
+    },
+    {
+      "timestamp": "2026-10-21 22:00:00+00:00",
+      "close": 56925.0441,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.052265,
+      "predicted_vol_t1": 0.057192
+    },
+    {
+      "timestamp": "2026-10-21 23:00:00+00:00",
+      "close": 57175.8945,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.015128,
+      "predicted_vol_t1": 0.037335
+    }
+  ]
+}

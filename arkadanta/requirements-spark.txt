@@ -1,0 +1,2 @@
+# Khusus Orang 1 (Pipeline Big Data & PySpark Batch Layer)
+pyspark>=3.5.0

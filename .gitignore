@@ -1,0 +1,14 @@
+.venv/
+venv/
+.npm-cache/
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+*$py.class
+*.joblib
+.streamlit/
+data/drop_zone/*.csv
+data/models/*.joblib
+data/models/*.json
+data/audit_logs.json
