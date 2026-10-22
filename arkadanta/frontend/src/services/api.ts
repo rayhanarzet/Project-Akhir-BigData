@@ -2,6 +2,7 @@ import {
   AnalyticsRunResponse,
   CandlePoint,
   CorrelationResponse,
+  CronStatus,
   DynamicConfigPayload,
   HistoricalBaselineResponse,
   IngestionAuditReport,
@@ -309,6 +310,62 @@ export async function triggerBinanceLiveSync(
       quality_score_pct: 100.0,
     }));
     return { synced_assets: reports.length, reports };
+  }
+}
+
+let localCronState: CronStatus = {
+  enabled: false,
+  interval_minutes: 5,
+  symbols: SUPPORTED_SYMBOLS,
+  limit: 60,
+  last_run: null,
+  next_run: null,
+  last_status: 'IDLE',
+  last_synced_count: 0,
+  total_runs: 0,
+};
+
+export async function fetchCronStatus(): Promise<CronStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/api/ingestion/cron-status`);
+    if (!res.ok) throw new Error('Cron status error');
+    return await res.json();
+  } catch {
+    return localCronState;
+  }
+}
+
+export async function updateCronConfig(
+  enabled: boolean,
+  intervalMinutes: number,
+  symbols: string[] = SUPPORTED_SYMBOLS,
+  limit: number = 60
+): Promise<CronStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/api/ingestion/cron-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled,
+        interval_minutes: intervalMinutes,
+        symbols,
+        limit,
+      }),
+    });
+    if (!res.ok) throw new Error('Cron config error');
+    return await res.json();
+  } catch {
+    const now = Date.now();
+    localCronState = {
+      ...localCronState,
+      enabled,
+      interval_minutes: intervalMinutes,
+      symbols,
+      limit,
+      last_status: enabled ? 'CRON_ACTIVE' : 'STOPPED',
+      next_run: enabled ? new Date(now + intervalMinutes * 60_000).toISOString() : null,
+    };
+    return localCronState;
   }
 }
 

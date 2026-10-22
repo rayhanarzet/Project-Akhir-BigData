@@ -2,26 +2,191 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bd-bg: #1e1e2f;
+  --bd-card: #27293d;
+  --bd-card-header: transparent;
+  --bd-input-bg: #1e1e2f;
+  --bd-border: #2b3553;
+  --bd-divider: rgba(255, 255, 255, 0.08);
+  --bd-text: #ffffff;
+  --bd-muted: #9a9a9a;
+  --bd-blue: #1d8cf8;
+  --bd-blue-dark: #3358f4;
+  --bd-teal: #00f2c3;
+  --bd-teal-dark: #0098f0;
+  --bd-pink: #e14eca;
+  --bd-pink-dark: #ba54f5;
+  --bd-warning: #ff8d72;
+  --bd-danger: #fd5d93;
+}
+
 @layer base {
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: radial-gradient(circle at 50% 0%, #0f172a 0%, #070b14 70%);
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bd-bg);
+    color: var(--bd-text);
     min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
   }
 }
 
-/* Custom sleek scrollbars */
+/* Creative Tim Black Dashboard Card */
+.bd-card {
+  background: #27293d;
+  border: 0;
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 20px 0px rgba(0, 0, 0, 0.12);
+  border-radius: 0.4285rem;
+}
+
+.bd-card-header {
+  padding: 18px 20px 0;
+  border: 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bd-card-body {
+  padding: 16px 20px 20px;
+}
+
+.bd-card-category {
+  text-transform: capitalize;
+  font-weight: 400;
+  color: #9a9a9a;
+  font-size: 0.78rem;
+  margin-bottom: 2px;
+}
+
+.bd-card-title {
+  color: #ffffff;
+  font-weight: 300;
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+}
+
+/* Black Dashboard Form Controls */
+.bd-input {
+  background-color: #1e1e2f;
+  border: 1px solid #2b3553;
+  border-radius: 0.4285rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bd-input:focus {
+  outline: none;
+  border-color: #1d8cf8;
+  box-shadow: none;
+}
+
+/* Black Dashboard Segmented Toggle Buttons */
+.bd-btn-toggle {
+  border: 1px solid #1d8cf8;
+  color: #1d8cf8;
+  background: transparent;
+  padding: 5px 13px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.bd-btn-toggle:first-child {
+  border-top-left-radius: 0.35rem;
+  border-bottom-left-radius: 0.35rem;
+}
+
+.bd-btn-toggle:last-child {
+  border-top-right-radius: 0.35rem;
+  border-bottom-right-radius: 0.35rem;
+}
+
+.bd-btn-toggle:not(:first-child) {
+  border-left: 0;
+}
+
+.bd-btn-toggle.active {
+  background-image: linear-gradient(to bottom left, #1d8cf8, #3358f4, #1d8cf8);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(29, 140, 248, 0.3);
+}
+
+/* Primary Action Button */
+.bd-btn-primary {
+  background-image: linear-gradient(to bottom left, #1d8cf8, #3358f4, #1d8cf8);
+  background-size: 210% 210%;
+  background-position: top right;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.4285rem;
+  padding: 9px 18px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.bd-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 14px rgba(50, 50, 93, 0.18), 0 3px 6px rgba(0, 0, 0, 0.12);
+}
+
+.bd-btn-teal {
+  background-image: linear-gradient(to bottom left, #00f2c3, #0098f0, #00f2c3);
+  background-size: 210% 210%;
+  background-position: top right;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.4285rem;
+  padding: 9px 18px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+/* Black Dashboard Table */
+.bd-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bd-table th {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 11px 10px;
+}
+
+.bd-table td {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  padding: 11px 10px;
+}
+
+/* Subtle Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #1e1e2f;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
+  background: #2b3553;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #3b486e;
 }

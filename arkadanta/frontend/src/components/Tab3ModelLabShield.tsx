@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
-  BrainCircuit,
+  Activity,
   Cpu,
+  Layers,
   Play,
   Shield,
-  ShieldAlert,
-  ShieldCheck,
+  Sliders,
   Target,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react';
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
-  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -35,7 +33,6 @@ import {
   fetchLatestModelMetrics,
   predictNextPeriodApi,
   runDynamicAnalyticsApi,
-  SUPPORTED_SYMBOLS,
   SUPPORTED_TIMEFRAMES,
   trainAndEvaluateModels,
 } from '../services/api';
@@ -45,28 +42,10 @@ interface Props {
   onChangeConfig: (partial: Partial<DynamicConfigPayload>) => void;
 }
 
-const REGIME_STYLES: Record<
-  RiskRegime,
-  { badge: string; border: string; text: string; hex: string }
-> = {
-  SAFE: {
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-    border: 'border-emerald-500/40',
-    text: 'text-emerald-400',
-    hex: '#10b981',
-  },
-  WARNING: {
-    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    border: 'border-amber-500/40',
-    text: 'text-amber-400',
-    hex: '#f59e0b',
-  },
-  DANGER: {
-    badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-    border: 'border-rose-500/40',
-    text: 'text-rose-400',
-    hex: '#ef4444',
-  },
+const REGIME_COLORS: Record<RiskRegime, string> = {
+  SAFE: '#00f2c3',
+  WARNING: '#ff8d72',
+  DANGER: '#fd5d93',
 };
 
 export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) => {
@@ -109,7 +88,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
 
   const toggleFeature = (feat: string) => {
     const exists = config.features.includes(feat);
-    if (exists && config.features.length <= 2) return; // Minimal 2 fitur
+    if (exists && config.features.length <= 2) return;
     const next = exists
       ? config.features.filter((f) => f !== feat)
       : [...config.features, feat];
@@ -117,7 +96,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
   };
 
   const predRegime: RiskRegime = prediction?.predicted_regime_t_plus_1 || 'SAFE';
-  const style = REGIME_STYLES[predRegime];
+  const regimeColor = REGIME_COLORS[predRegime];
 
   const probData = prediction
     ? (['SAFE', 'WARNING', 'DANGER'] as RiskRegime[]).map((r) => ({
@@ -127,208 +106,216 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
     : [];
 
   return (
-    <div className="space-y-6">
-      {/* LIVE MARKET SHIELD (HERO SECTION) */}
+    <div>
+      {/* ROW 1: LIVE MARKET SHIELD & RESISTANCE/STOP-LOSS CORRIDOR */}
       {prediction && (
-        <div
-          className={`bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border-2 ${style.border} rounded-2xl p-6 shadow-2xl space-y-6`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className={`p-3.5 rounded-xl border ${style.badge}`}>
-                {predRegime === 'SAFE' ? (
-                  <ShieldCheck className="w-8 h-8" />
-                ) : predRegime === 'WARNING' ? (
-                  <Shield className="w-8 h-8" />
-                ) : (
-                  <ShieldAlert className="w-8 h-8" />
-                )}
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left: T+1 Risk Status & Probability Distribution */}
+          <div className="lg:col-span-5 bd-card">
+            <div className="bd-card-header flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                    Live Market Shield (Prediksi Periode T+{prediction.target_horizon})
-                  </span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                </div>
-                <h2 className="text-2xl font-extrabold text-white mt-0.5">
-                  {prediction.symbol} ({prediction.timeframe}) &mdash; Status Risiko:{' '}
-                  <span className={style.text}>{predRegime}</span>
+                <h5 className="bd-card-category">
+                  Speed Layer Inference (Horizon T+{prediction.target_horizon})
+                </h5>
+                <h2 className="bd-card-title flex items-center gap-2.5">
+                  <Shield className="w-5 h-5" style={{ color: regimeColor }} />
+                  <span>{prediction.symbol} Market Shield</span>
                 </h2>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <select
-                value={config.symbol}
-                onChange={(e) => onChangeConfig({ symbol: e.target.value })}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-bold"
+              <span
+                style={{
+                  color: regimeColor,
+                  borderColor: regimeColor,
+                }}
+                className="px-3 py-1 rounded text-xs font-semibold border bg-black/20 tracking-wider"
               >
-                {SUPPORTED_SYMBOLS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={config.timeframe}
-                onChange={(e) => onChangeConfig({ timeframe: e.target.value as Timeframe })}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-cyan-400 font-bold"
-              >
-                {SUPPORTED_TIMEFRAMES.map((tf) => (
-                  <option key={tf} value={tf}>
-                    {tf}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 4 Main Shield Metrics: Current Price, Est Volatility, Resistance, Stop Loss */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-xs text-slate-400">Harga Saat Ini (Close T)</p>
-              <p className="text-2xl font-extrabold text-white font-mono mt-1">
-                ${prediction.current_price.toLocaleString()}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Cluster Saat Ini: #{prediction.current_cluster_id} ({prediction.current_regime_t})
-              </p>
+                {predRegime}
+              </span>
             </div>
 
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-xs text-slate-400">Estimasi Volatilitas (T+1)</p>
-              <p className="text-2xl font-extrabold text-cyan-400 font-mono mt-1">
-                {prediction.predicted_volatility_pct.toFixed(3)}%
-              </p>
-              <p className="text-xs text-slate-400 mt-1 font-mono">
-                Rentang &plusmn;${prediction.estimated_volatility_nominal.toLocaleString()}
-              </p>
-            </div>
+            <div className="bd-card-body space-y-5">
+              {/* 4 Key Readouts */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                  <span className="text-[11px] text-[#9a9a9a] block">Current Close (T)</span>
+                  <span className="text-lg font-mono font-semibold text-white mt-0.5 block">
+                    ${prediction.current_price.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-[#9a9a9a]">
+                    Cluster #{prediction.current_cluster_id} ({prediction.current_regime_t})
+                  </span>
+                </div>
 
-            <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-emerald-300 font-semibold">
-                  Batas Atas (Resistance T+1)
-                </p>
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                  <span className="text-[11px] text-[#9a9a9a] block">
+                    Est. Volatility (T+1)
+                  </span>
+                  <span className="text-lg font-mono font-semibold text-[#1d8cf8] mt-0.5 block">
+                    {prediction.predicted_volatility_pct.toFixed(3)}%
+                  </span>
+                  <span className="text-[10px] text-[#9a9a9a] font-mono">
+                    &plusmn;${prediction.estimated_volatility_nominal.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                  <span className="text-[11px] text-[#9a9a9a] block">
+                    Resistance Bound (T+1)
+                  </span>
+                  <span className="text-lg font-mono font-semibold text-[#00f2c3] mt-0.5 block">
+                    ${prediction.resistance_level.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-[#9a9a9a]">Price + Est. Volatility</span>
+                </div>
+
+                <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                  <span className="text-[11px] text-[#9a9a9a] block">
+                    Stop Loss Bound (T+1)
+                  </span>
+                  <span className="text-lg font-mono font-semibold text-[#fd5d93] mt-0.5 block">
+                    ${prediction.stop_loss_level.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-[#9a9a9a]">Price &minus; Est. Volatility</span>
+                </div>
               </div>
-              <p className="text-2xl font-extrabold text-emerald-400 font-mono mt-1">
-                ${prediction.resistance_level.toLocaleString()}
-              </p>
-              <p className="text-[11px] text-emerald-300/80 mt-1">
-                Harga Saat Ini + Estimasi Volatilitas
-              </p>
-            </div>
 
-            <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-rose-300 font-semibold">
-                  Batas Bawah (Stop Loss T+1)
-                </p>
-                <TrendingDown className="w-4 h-4 text-rose-400" />
-              </div>
-              <p className="text-2xl font-extrabold text-rose-400 font-mono mt-1">
-                ${prediction.stop_loss_level.toLocaleString()}
-              </p>
-              <p className="text-[11px] text-rose-300/80 mt-1">
-                Harga Saat Ini &minus; Estimasi Volatilitas
-              </p>
-            </div>
-          </div>
-
-          {/* Probability Bars + Live Price Band Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+              {/* Class Probability Bars */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">
-                  Distribusi Probabilitas Rezim Risiko (T+1)
-                </h4>
-                <div className="h-48 w-full">
+                <div className="flex items-center justify-between text-xs text-[#9a9a9a] mb-2">
+                  <span>Random Forest T+1 Regime Probabilities</span>
+                  <span className="font-mono text-white">
+                    P({predRegime}) ={' '}
+                    {((prediction.probabilities_t_plus_1[predRegime] || 0) * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-[115px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={probData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis type="number" domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="2 4" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        tick={{ fontSize: 10, fill: '#9a9a9a' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
                       <YAxis
                         type="category"
                         dataKey="regime"
-                        stroke="#cbd5e1"
-                        tick={{ fontSize: 12, fontWeight: 700 }}
+                        tick={{ fontSize: 11, fill: '#ffffff' }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={70}
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#0f172a',
-                          borderColor: '#334155',
-                          fontSize: '12px',
+                          backgroundColor: '#1e1e2f',
+                          border: '1px solid #2b3553',
+                          fontSize: '11px',
                         }}
                       />
-                      <Bar dataKey="probPct" radius={[0, 6, 6, 0]} name="Probabilitas (%)">
+                      <Bar dataKey="probPct" radius={[0, 4, 4, 0]} name="Probability (%)">
                         {probData.map((entry) => (
-                          <Cell
-                            key={entry.regime}
-                            fill={REGIME_STYLES[entry.regime].hex}
-                          />
+                          <Cell key={entry.regime} fill={REGIME_COLORS[entry.regime]} />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400 italic mt-2">{prediction.disclaimer}</p>
+            </div>
+          </div>
+
+          {/* Right: Live Price Trajectory & Volatility Corridor Chart */}
+          <div className="lg:col-span-7 bd-card">
+            <div className="bd-card-header flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h5 className="bd-card-category">Dynamic Volatility Corridor</h5>
+                <h2 className="bd-card-title">
+                  {prediction.symbol} ({prediction.timeframe}) Resistance &amp; Stop Loss Bands
+                </h2>
+              </div>
+              <div className="inline-flex">
+                {SUPPORTED_TIMEFRAMES.map((tf) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => onChangeConfig({ timeframe: tf })}
+                    className={`bd-btn-toggle ${config.timeframe === tf ? 'active' : ''}`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="lg:col-span-7 bg-slate-950/70 border border-slate-800/80 rounded-xl p-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">
-                Pergerakan Harga Terbaru dengan Koridor Resistance & Stop Loss (T+1)
-              </h4>
-              <div className="h-52 w-full">
+            <div className="bd-card-body">
+              <div className="h-[310px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={recentPrices}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <ComposedChart
+                    data={recentPrices}
+                    margin={{ top: 12, right: 16, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="bdShieldGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1d8cf8" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#1d8cf8" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="2 4" stroke="rgba(29, 140, 248, 0.08)" />
+                    <XAxis
+                      dataKey="time"
+                      tick={{ fontSize: 10, fill: '#9a9a9a' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <YAxis
                       domain={[
                         prediction.stop_loss_level * 0.996,
                         prediction.resistance_level * 1.004,
                       ]}
-                      stroke="#64748b"
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: '#9a9a9a' }}
+                      axisLine={false}
+                      tickLine={false}
                       tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
+                        backgroundColor: '#1e1e2f',
+                        border: '1px solid #2b3553',
                         fontSize: '12px',
                       }}
                     />
                     <ReferenceLine
                       y={prediction.resistance_level}
-                      stroke="#10b981"
-                      strokeDasharray="5 5"
+                      stroke="#00f2c3"
+                      strokeDasharray="4 4"
                       label={{
-                        value: `Resistance: $${prediction.resistance_level}`,
-                        fill: '#10b981',
+                        value: `Resistance T+1 ($${prediction.resistance_level})`,
+                        fill: '#00f2c3',
                         fontSize: 11,
+                        position: 'insideTopRight',
                       }}
                     />
                     <ReferenceLine
                       y={prediction.stop_loss_level}
-                      stroke="#ef4444"
-                      strokeDasharray="5 5"
+                      stroke="#fd5d93"
+                      strokeDasharray="4 4"
                       label={{
-                        value: `Stop Loss: $${prediction.stop_loss_level}`,
-                        fill: '#ef4444',
+                        value: `Stop Loss T+1 ($${prediction.stop_loss_level})`,
+                        fill: '#fd5d93',
                         fontSize: 11,
+                        position: 'insideBottomRight',
                       }}
                     />
-                    <Line
+                    <Area
                       type="monotone"
                       dataKey="close"
-                      stroke="#38bdf8"
-                      strokeWidth={2.5}
-                      dot={false}
-                      name="Harga Close"
+                      stroke="#1d8cf8"
+                      strokeWidth={2}
+                      fill="url(#bdShieldGrad)"
+                      name="Close Price"
+                      dot={{ r: 2.5, fill: '#27293d', stroke: '#1d8cf8', strokeWidth: 1.5 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -338,329 +325,340 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
         </div>
       )}
 
-      {/* MODEL LAB CONFIGURATION PANEL */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-lg space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* ROW 2: MODEL TRAINING & FEATURE SELECTION CONTROLS */}
+      <div className="bd-card">
+        <div className="bd-card-header flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-semibold text-white flex items-center gap-2">
-              <BrainCircuit className="w-5 h-5 text-cyan-400" />
-              Model Lab: Konfigurasi Dinamis K-Means Clustering & Random Forest (T+1)
+            <h5 className="bd-card-category">Dynamic Machine Learning Pipeline</h5>
+            <h3 className="bd-card-title !text-lg flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[#1d8cf8]" />
+              K-Means Risk Labeler &amp; Random Forest (T+1) Configuration
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Pilih kombinasi fitur, jumlah cluster K-Means, rasio validasi temporal, dan
-              hyperparameter Random Forest
-            </p>
           </div>
-
           <button
             type="button"
             onClick={handleTrainModel}
             disabled={training}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-40 text-white font-bold text-sm transition flex items-center gap-2 shadow-lg"
+            className="bd-btn-primary flex items-center gap-2 disabled:opacity-50"
           >
-            <Play className="w-4 h-4" />
-            {training
-              ? 'Melatih K-Means & Random Forest...'
-              : 'Latih Ulang & Evaluasi Model (Temporal Split)'}
+            <Play className="w-3.5 h-3.5" />
+            {training ? 'Training Models (Temporal Split)...' : 'Train & Evaluate Models'}
           </button>
         </div>
 
-        {/* Feature Pills Selector */}
-        <div>
-          <label className="block text-xs text-slate-400 mb-2">
-            Subset Fitur Dinamis Terpilih ({config.features.length} Fitur Aktif):
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {AVAILABLE_FEATURES.map((feat) => {
-              const active = config.features.includes(feat);
-              return (
-                <button
-                  type="button"
-                  key={feat}
-                  onClick={() => toggleFeature(feat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition border ${
-                    active
-                      ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-semibold'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  {feat}
-                </button>
-              );
-            })}
+        <div className="bd-card-body space-y-5">
+          {/* Dynamic Feature Subset Selector */}
+          <div>
+            <label className="block text-xs text-[#9a9a9a] mb-2">
+              Active Feature Subset ({config.features.length} Selected &mdash; Minimum 2):
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_FEATURES.map((feat) => {
+                const active = config.features.includes(feat);
+                return (
+                  <button
+                    key={feat}
+                    type="button"
+                    onClick={() => toggleFeature(feat)}
+                    className={`px-3 py-1.5 rounded-[0.35rem] text-xs font-mono transition border ${
+                      active
+                        ? 'bg-[#1d8cf8]/20 border-[#1d8cf8] text-white'
+                        : 'bg-[#1e1e2f] border-[#2b3553] text-[#9a9a9a] hover:text-white'
+                    }`}
+                  >
+                    {feat}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Hyperparameters */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              Jumlah Cluster K-Means (k = {config.cluster_k})
-            </label>
-            <input
-              type="range"
-              min={3}
-              max={5}
-              value={config.cluster_k}
-              onChange={(e) => onChangeConfig({ cluster_k: Number(e.target.value) })}
-              className="w-full accent-cyan-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              Temporal Split Train Ratio ({Math.round(config.train_ratio * 100)}%)
-            </label>
-            <input
-              type="range"
-              min={0.6}
-              max={0.9}
-              step={0.05}
-              value={config.train_ratio}
-              onChange={(e) => onChangeConfig({ train_ratio: Number(e.target.value) })}
-              className="w-full accent-cyan-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              RF Num Trees (n_estimators)
-            </label>
-            <input
-              type="number"
-              min={50}
-              max={500}
-              step={50}
-              value={config.rf_num_trees}
-              onChange={(e) => onChangeConfig({ rf_num_trees: Number(e.target.value) || 200 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white font-mono"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">RF Max Depth</label>
-            <input
-              type="number"
-              min={3}
-              max={25}
-              value={config.rf_max_depth}
-              onChange={(e) => onChangeConfig({ rf_max_depth: Number(e.target.value) || 10 })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-white font-mono"
-            />
+          {/* Hyperparameter Inputs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                K-Means Clusters (k = {config.cluster_k})
+              </label>
+              <input
+                type="number"
+                min={3}
+                max={5}
+                value={config.cluster_k}
+                onChange={(e) => onChangeConfig({ cluster_k: Number(e.target.value) || 3 })}
+                className="bd-input w-full font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                Temporal Train Ratio ({Math.round(config.train_ratio * 100)}%)
+              </label>
+              <input
+                type="number"
+                step={0.05}
+                min={0.6}
+                max={0.9}
+                value={config.train_ratio}
+                onChange={(e) => onChangeConfig({ train_ratio: Number(e.target.value) || 0.8 })}
+                className="bd-input w-full font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                Random Forest Trees (n_estimators)
+              </label>
+              <input
+                type="number"
+                step={50}
+                min={50}
+                max={500}
+                value={config.rf_num_trees}
+                onChange={(e) =>
+                  onChangeConfig({ rf_num_trees: Number(e.target.value) || 200 })
+                }
+                className="bd-input w-full font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                Random Forest Max Depth
+              </label>
+              <input
+                type="number"
+                min={3}
+                max={25}
+                value={config.rf_max_depth}
+                onChange={(e) =>
+                  onChangeConfig({ rf_max_depth: Number(e.target.value) || 10 })
+                }
+                className="bd-input w-full font-mono"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* EVALUATION & CENTROID RANKING RESULTS */}
+      {/* ROW 3: EVALUATION METRICS, CENTROID RANKING & FEATURE IMPORTANCES */}
       {metrics && (
         <>
-          {/* Metric KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">K-Means Silhouette</p>
-              <p className="text-xl font-bold text-cyan-400 font-mono mt-1">
-                {metrics.kmeans_metrics.silhouette_score}
-              </p>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">RF Accuracy (T+1)</p>
-              <p className="text-xl font-bold text-emerald-400 font-mono mt-1">
-                {(metrics.classification_metrics.accuracy * 100).toFixed(2)}%
-              </p>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">Macro F1-Score</p>
-              <p className="text-xl font-bold text-white font-mono mt-1">
-                {metrics.classification_metrics.f1_macro}
-              </p>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">Macro Precision</p>
-              <p className="text-xl font-bold text-white font-mono mt-1">
-                {metrics.classification_metrics.precision_macro}
-              </p>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">Volatilitas MAE (T+1)</p>
-              <p className="text-xl font-bold text-amber-400 font-mono mt-1">
-                {metrics.regression_metrics.mae}
-              </p>
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-              <p className="text-[11px] text-slate-400">Volatilitas RMSE (T+1)</p>
-              <p className="text-xl font-bold text-rose-400 font-mono mt-1">
-                {metrics.regression_metrics.rmse}
-              </p>
-            </div>
-          </div>
-
-          {/* K-Means Centroid Ranking Table (Bab 5.5 Proof) */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-lg space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                  <Target className="w-5 h-5 text-emerald-400" />
-                  Tabel Interpretasi Centroid K-Means & Pemetaan Risiko Dinamis (Bab 5.5)
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  ID cluster mentah (0, 1, 2) diurutkan berdasarkan{' '}
-                  <span className="text-cyan-300 font-semibold">Composite Risk Score</span> dari
-                  terendah ke tertinggi menjadi SAFE, WARNING, dan DANGER
-                </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* K-Means Centroid Risk Ordering Table */}
+            <div className="lg:col-span-7 bd-card">
+              <div className="bd-card-header flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h5 className="bd-card-category">
+                    Unsupervised Regime Discovery (Silhouette Score:{' '}
+                    {metrics.kmeans_metrics.silhouette_score})
+                  </h5>
+                  <h4 className="bd-card-title !text-base flex items-center gap-2">
+                    <Target className="w-4 h-4 text-[#00f2c3]" />
+                    K-Means Centroid Risk Scoring &amp; Regime Mapping
+                  </h4>
+                </div>
+                <span className="text-xs text-[#9a9a9a] font-mono">
+                  Train: {metrics.temporal_split.train_samples} | Test:{' '}
+                  {metrics.temporal_split.test_samples}
+                </span>
               </div>
-              <span className="text-xs font-mono text-slate-400">
-                Train: {metrics.temporal_split.train_samples} | Test:{' '}
-                {metrics.temporal_split.test_samples} (Temporal Split)
-              </span>
+              <div className="bd-card-body">
+                <div className="overflow-x-auto">
+                  <table className="bd-table">
+                    <thead>
+                      <tr>
+                        <th className="text-left">Rank</th>
+                        <th className="text-left">Raw Cluster ID</th>
+                        <th className="text-left">Mapped Regime</th>
+                        <th className="text-right">Composite Risk Score</th>
+                        <th className="text-right">Train Observations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.kmeans_metrics.centroids.map((c) => {
+                        const col = REGIME_COLORS[c.assigned_risk_label];
+                        return (
+                          <tr key={c.cluster_id}>
+                            <td className="font-mono text-white">#{c.risk_rank}</td>
+                            <td className="font-mono text-[#1d8cf8]">Cluster {c.cluster_id}</td>
+                            <td>
+                              <span
+                                style={{ color: col, borderColor: col }}
+                                className="px-2.5 py-0.5 rounded text-xs font-semibold border bg-black/20"
+                              >
+                                {c.assigned_risk_label}
+                              </span>
+                            </td>
+                            <td className="text-right font-mono text-white">
+                              {c.composite_risk_score}
+                            </td>
+                            <td className="text-right font-mono text-[#9a9a9a]">
+                              {c.train_sample_count.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 uppercase">
-                    <th className="py-3 px-4">Urutan Risiko</th>
-                    <th className="py-3 px-4">ID Cluster K-Means</th>
-                    <th className="py-3 px-4">Label Risiko Terpetakan</th>
-                    <th className="py-3 px-4">Skor Risiko Gabungan (Z)</th>
-                    <th className="py-3 px-4">Jumlah Sampel Latih</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {metrics.kmeans_metrics.centroids.map((c) => {
-                    const rStyle = REGIME_STYLES[c.assigned_risk_label];
-                    return (
-                      <tr key={c.cluster_id} className="hover:bg-slate-800/40">
-                        <td className="py-3 px-4 font-bold text-slate-200">
-                          Peringkat #{c.risk_rank}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-cyan-400">
-                          Cluster {c.cluster_id}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-bold border ${rStyle.badge}`}
-                          >
-                            {c.assigned_risk_label}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-white font-semibold">
-                          {c.composite_risk_score}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-slate-300">
-                          {c.train_sample_count.toLocaleString()} candle
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Random Forest Feature Importance Chart */}
+            <div className="lg:col-span-5 bd-card">
+              <div className="bd-card-header flex items-center justify-between">
+                <div>
+                  <h5 className="bd-card-category">
+                    Regression MAE: {metrics.regression_metrics.mae} | RMSE:{' '}
+                    {metrics.regression_metrics.rmse}
+                  </h5>
+                  <h4 className="bd-card-title !text-base flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-[#1d8cf8]" />
+                    Random Forest Feature Importance
+                  </h4>
+                </div>
+              </div>
+              <div className="bd-card-body">
+                <div className="h-[205px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={metrics.feature_importances} layout="vertical">
+                      <CartesianGrid strokeDasharray="2 4" stroke="rgba(29, 140, 248, 0.08)" />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 10, fill: '#9a9a9a' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="feature"
+                        width={120}
+                        tick={{ fontSize: 11, fill: '#ffffff' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e1e2f',
+                          border: '1px solid #2b3553',
+                          fontSize: '11px',
+                        }}
+                      />
+                      <Bar
+                        dataKey="importance"
+                        fill="#1d8cf8"
+                        radius={[0, 4, 4, 0]}
+                        name="Importance"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Confusion Matrix, Per-Class Metrics & Feature Importance */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Per-Class Precision, Recall, F1 */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3">
-              <h4 className="text-sm font-semibold text-white">
-                Evaluasi Per Kelas Risiko pada Data Uji Kronologis
-              </h4>
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="py-2 px-2">Kelas</th>
-                    <th className="py-2 px-2">Precision</th>
-                    <th className="py-2 px-2">Recall</th>
-                    <th className="py-2 px-2">F1-Score</th>
-                    <th className="py-2 px-2">Support</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {(['SAFE', 'WARNING', 'DANGER'] as RiskRegime[]).map((cls) => {
-                    const row = metrics.classification_metrics.per_class[cls];
-                    return (
-                      <tr key={cls}>
-                        <td className={`py-2.5 px-2 font-bold ${REGIME_STYLES[cls].text}`}>
-                          {cls}
-                        </td>
-                        <td className="py-2.5 px-2 font-mono text-slate-200">{row?.precision}</td>
-                        <td className="py-2.5 px-2 font-mono text-slate-200">{row?.recall}</td>
-                        <td className="py-2.5 px-2 font-mono text-cyan-400 font-semibold">
-                          {row?.f1_score}
-                        </td>
-                        <td className="py-2.5 px-2 font-mono text-slate-400">{row?.support}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Confusion Matrix */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3">
-              <h4 className="text-sm font-semibold text-white">
-                Confusion Matrix (Aktual vs Prediksi T+1)
-              </h4>
-              <table className="w-full text-center border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <th className="p-2 text-slate-400">Aktual \ Pred</th>
-                    {metrics.classification_metrics.labels.map((l) => (
-                      <th key={l} className="p-2 text-slate-300 font-bold">
-                        {l}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {metrics.classification_metrics.confusion_matrix.map((row, rIdx) => {
-                    const lbl = metrics.classification_metrics.labels[rIdx];
-                    return (
-                      <tr key={lbl} className="border-t border-slate-800/60">
-                        <td className="p-2 font-bold text-slate-300 text-left">{lbl}</td>
-                        {row.map((val, cIdx) => (
+          {/* Bottom Row: Per-Class Classification Metrics + Confusion Matrix */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-6 bd-card">
+              <div className="bd-card-header flex items-center justify-between">
+                <div>
+                  <h5 className="bd-card-category">
+                    Chronological Out-of-Sample Evaluation (Accuracy:{' '}
+                    {(metrics.classification_metrics.accuracy * 100).toFixed(2)}%)
+                  </h5>
+                  <h4 className="bd-card-title !text-base">
+                    Per-Class Precision, Recall &amp; F1-Score
+                  </h4>
+                </div>
+                <span className="text-xs font-mono text-[#00f2c3]">
+                  Macro F1: {metrics.classification_metrics.f1_macro}
+                </span>
+              </div>
+              <div className="bd-card-body">
+                <table className="bd-table">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Regime Class</th>
+                      <th className="text-right">Precision</th>
+                      <th className="text-right">Recall</th>
+                      <th className="text-right">F1-Score</th>
+                      <th className="text-right">Test Support</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(['SAFE', 'WARNING', 'DANGER'] as RiskRegime[]).map((cls) => {
+                      const row = metrics.classification_metrics.per_class[cls];
+                      return (
+                        <tr key={cls}>
                           <td
-                            key={cIdx}
-                            className={`p-2.5 font-mono rounded ${
-                              rIdx === cIdx
-                                ? 'bg-cyan-500/25 text-cyan-200 font-bold'
-                                : 'bg-slate-950 text-slate-400'
-                            }`}
+                            style={{ color: REGIME_COLORS[cls] }}
+                            className="font-semibold"
                           >
-                            {val}
+                            {cls}
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className="text-right font-mono">{row?.precision}</td>
+                          <td className="text-right font-mono">{row?.recall}</td>
+                          <td className="text-right font-mono text-white font-semibold">
+                            {row?.f1_score}
+                          </td>
+                          <td className="text-right font-mono text-[#9a9a9a]">
+                            {row?.support}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* Feature Importances */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3">
-              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-cyan-400" />
-                Random Forest Feature Importance
-              </h4>
-              <div className="h-48 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metrics.feature_importances} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis
-                      type="category"
-                      dataKey="feature"
-                      width={115}
-                      stroke="#cbd5e1"
-                      tick={{ fontSize: 11 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#0f172a',
-                        borderColor: '#334155',
-                        fontSize: '11px',
-                      }}
-                    />
-                    <Bar dataKey="importance" fill="#06b6d4" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+            <div className="lg:col-span-6 bd-card">
+              <div className="bd-card-header">
+                <h5 className="bd-card-category">Temporal Test Set</h5>
+                <h4 className="bd-card-title !text-base">
+                  Confusion Matrix (Actual T+1 vs Predicted T+1)
+                </h4>
+              </div>
+              <div className="bd-card-body">
+                <table className="bd-table">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Actual \ Predicted</th>
+                      {metrics.classification_metrics.labels.map((l) => (
+                        <th key={l} className="text-right">
+                          {l}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metrics.classification_metrics.confusion_matrix.map((row, rIdx) => {
+                      const lbl = metrics.classification_metrics.labels[rIdx];
+                      return (
+                        <tr key={lbl}>
+                          <td
+                            style={{ color: REGIME_COLORS[lbl] }}
+                            className="font-semibold"
+                          >
+                            {lbl}
+                          </td>
+                          {row.map((val, cIdx) => (
+                            <td
+                              key={cIdx}
+                              className={`text-right font-mono ${
+                                rIdx === cIdx
+                                  ? 'text-[#00f2c3] font-semibold'
+                                  : 'text-[#9a9a9a]'
+                              }`}
+                            >
+                              {val}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

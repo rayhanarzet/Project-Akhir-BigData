@@ -46,6 +46,18 @@ export interface HistoricalBaselineResponse {
   audit_logs: IngestionAuditReport[];
 }
 
+export interface CronStatus {
+  enabled: boolean;
+  interval_minutes: number;
+  symbols: string[];
+  limit: number;
+  last_run: string | null;
+  next_run: string | null;
+  last_status: string;
+  last_synced_count: number;
+  total_runs: number;
+}
+
 export interface CandlePoint {
   timestamp: string;
   coin_symbol: string;

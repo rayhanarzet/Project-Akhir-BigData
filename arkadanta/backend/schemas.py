@@ -37,6 +37,27 @@ class LiveSyncRequest(BaseModel):
     limit: int = Field(default=300, ge=50, le=1000)
 
 
+class CronConfigRequest(BaseModel):
+    enabled: bool
+    interval_minutes: int = Field(default=5, ge=1, le=1440)
+    symbols: List[str] = Field(
+        default_factory=lambda: ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT"]
+    )
+    limit: int = Field(default=60, ge=10, le=500)
+
+
+class CronStatusResponse(BaseModel):
+    enabled: bool
+    interval_minutes: int
+    symbols: List[str]
+    limit: int
+    last_run: Optional[str] = None
+    next_run: Optional[str] = None
+    last_status: str
+    last_synced_count: int
+    total_runs: int
+
+
 class DynamicConfig(BaseModel):
     """Konfigurasi dinamis sesuai Bab 5.7 Proposal Arkadanta."""
 

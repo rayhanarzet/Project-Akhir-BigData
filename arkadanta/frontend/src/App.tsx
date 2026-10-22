@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   Activity,
-  BrainCircuit,
+  Cpu,
   Database,
   Layers,
-  Server,
-  Shield,
+  Menu,
+  Radio,
+  Sliders,
+  X,
 } from 'lucide-react';
 import {
   DynamicConfigPayload,
@@ -16,8 +18,18 @@ import { Tab1Ingestion } from './components/Tab1Ingestion';
 import { Tab2AnalyticsBI } from './components/Tab2AnalyticsBI';
 import { Tab3ModelLabShield } from './components/Tab3ModelLabShield';
 
+type SidebarTheme = 'blue' | 'green' | 'primary';
+
+const SIDEBAR_GRADIENTS: Record<SidebarTheme, string> = {
+  blue: 'linear-gradient(0deg, #3358f4 0%, #1d8cf8 100%)',
+  green: 'linear-gradient(0deg, #0098f0 0%, #00f2c3 100%)',
+  primary: 'linear-gradient(0deg, #ba54f5 0%, #e14eca 100%)',
+};
+
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3'>('tab2');
+  const [activeTab, setActiveTab] = useState<'tab2' | 'tab3' | 'tab1'>('tab2');
+  const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>('blue');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [baseline, setBaseline] = useState<HistoricalBaselineResponse | null>(null);
   const [isLiveBackend, setIsLiveBackend] = useState<boolean>(false);
 
@@ -63,124 +75,227 @@ export const App: React.FC = () => {
     setConfig((prev) => ({ ...prev, ...partial }));
   };
 
+  const navItems: {
+    id: 'tab2' | 'tab3' | 'tab1';
+    label: string;
+    subtitle: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'tab2',
+      label: 'Market Analytics',
+      subtitle: 'Dynamic BI & Anomalies',
+      icon: <Activity className="w-4 h-4" />,
+    },
+    {
+      id: 'tab3',
+      label: 'Model Lab & Shield',
+      subtitle: 'K-Means & RF T+1 Risk',
+      icon: <Cpu className="w-4 h-4" />,
+    },
+    {
+      id: 'tab1',
+      label: 'Data Ingestion',
+      subtitle: 'HDFS, NiFi & Cron Sync',
+      icon: <Database className="w-4 h-4" />,
+    },
+  ];
+
+  const activeNav = navItems.find((n) => n.id === activeTab) || navItems[0];
+
   return (
-    <div className="min-h-screen flex flex-col text-slate-100">
-      {/* Top Institutional Navigation Header */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#070b14]/90 border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 text-white shadow-lg shadow-cyan-500/20">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
-                  ARKADANTA
-                </h1>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                  Lambda Architecture v1.0
+    <div className="min-h-screen bg-[#1e1e2f] text-white flex relative">
+      {/* Black Dashboard Floating Left Sidebar */}
+      <aside
+        style={{ background: SIDEBAR_GRADIENTS[sidebarTheme] }}
+        className={`fixed z-40 top-0 lg:top-5 left-0 lg:left-5 bottom-0 lg:bottom-5 w-[230px] lg:rounded-[5px] shadow-2xl transition-transform duration-200 flex flex-col justify-between ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div>
+          {/* Brand Logo Header */}
+          <div className="px-5 py-4 flex items-center justify-between border-b border-white/20">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-white font-semibold text-xs tracking-wider">
+                AK
+              </div>
+              <div>
+                <span className="text-sm font-semibold tracking-wider uppercase block text-white">
+                  Arkadanta
+                </span>
+                <span className="text-[10px] text-white/75 tracking-wide block">
+                  Lambda Risk Pipeline
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Dynamic Big Data Intelligence Pipeline &mdash; Analisis, Anomali & Prediksi Risiko
-                Volatilitas Kripto
-              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden text-white/80 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Navigation List */}
+          <nav className="mt-5 px-3 space-y-1.5">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-[4px] text-left transition-all relative ${
+                    isActive
+                      ? 'text-white font-semibold bg-white/10'
+                      : 'text-white/75 hover:text-white hover:bg-white/5 font-light'
+                  }`}
+                >
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white absolute right-3.5 top-1/2 -translate-y-1/2" />
+                  )}
+                  <span className="shrink-0 opacity-90">{item.icon}</span>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider leading-tight">
+                      {item.label}
+                    </p>
+                    <p className="text-[10px] text-white/65 font-light mt-0.5">
+                      {item.subtitle}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom Sidebar Context & Theme Switcher (Black Dashboard Fixed Plugin Style) */}
+        <div className="p-4 border-t border-white/20 space-y-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-white/70 mb-1.5">
+              Active Pair & Timeframe
+            </p>
+            <div className="bg-black/20 rounded px-3 py-2 flex items-center justify-between text-xs font-mono">
+              <span className="font-semibold text-white">{config.symbol}</span>
+              <span className="px-1.5 py-0.5 rounded bg-white/15 text-[11px]">
+                {config.timeframe}
+              </span>
             </div>
           </div>
 
-          {/* Connection Status & Quick Asset Switcher */}
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[10px] uppercase tracking-wider text-white/75">
+              Sidebar Accent
+            </span>
+            <div className="flex items-center gap-1.5">
+              {(
+                [
+                  { id: 'blue', color: '#1d8cf8' },
+                  { id: 'green', color: '#00f2c3' },
+                  { id: 'primary', color: '#e14eca' },
+                ] as { id: SidebarTheme; color: string }[]
+              ).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSidebarTheme(t.id)}
+                  style={{ backgroundColor: t.color }}
+                  className={`w-4 h-4 rounded-full border transition-transform ${
+                    sidebarTheme === t.id
+                      ? 'border-white scale-110'
+                      : 'border-transparent opacity-75 hover:opacity-100'
+                  }`}
+                  aria-label={`Theme ${t.id}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Panel Area */}
+      <div className="flex-1 lg:pl-[270px] flex flex-col min-h-screen w-full">
+        {/* Top Navbar */}
+        <header className="px-6 pt-5 pb-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 rounded-xl p-1">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded bg-[#27293d] text-white/80 hover:text-white"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-[#9a9a9a] font-normal">
+                Arkadanta Big Data Pipeline / {activeNav.label}
+              </p>
+              <h1 className="text-lg font-light tracking-wide text-white mt-0.5">
+                {activeNav.label}{' '}
+                <span className="text-[#9a9a9a] font-light text-sm">
+                  &mdash; {activeNav.subtitle}
+                </span>
+              </h1>
+            </div>
+          </div>
+
+          {/* Right Top Controls: Segmented Asset Switcher & API Status */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex">
               {SUPPORTED_SYMBOLS.map((sym) => (
                 <button
                   key={sym}
                   type="button"
                   onClick={() => updateConfig({ symbol: sym })}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                    config.symbol === sym
-                      ? 'bg-cyan-500 text-slate-950 shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className={`bd-btn-toggle ${config.symbol === sym ? 'active' : ''}`}
                 >
-                  {sym.replace('USDT', '')}
+                  {sym}
                 </button>
               ))}
             </div>
 
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
-                isLiveBackend
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5" />
-              <span>{isLiveBackend ? 'FastAPI Connected' : 'Interactive Engine Active'}</span>
+            <div className="bg-[#27293d] px-3.5 py-1.5 rounded-[0.4285rem] flex items-center gap-2 text-xs border border-[#2b3553]">
+              <Radio
+                className={`w-3.5 h-3.5 ${
+                  isLiveBackend ? 'text-[#00f2c3]' : 'text-[#1d8cf8]'
+                }`}
+              />
+              <span className="text-[#9a9a9a]">Serving Layer:</span>
+              <span className="font-medium text-white">
+                {isLiveBackend ? 'FastAPI Live (8000)' : 'Local Engine'}
+              </span>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* 3 Main Tabs Bar (Bab 7 Proposal) */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex overflow-x-auto gap-2 border-t border-slate-800/50 pt-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('tab1')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
-              activeTab === 'tab1'
-                ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Database className="w-4 h-4" />
-            Tab 1 &mdash; Data Ingestion & Preprocessing Manager
-          </button>
+        {/* View Content */}
+        <main className="flex-1 px-6 py-3">
+          {activeTab === 'tab1' && baseline && (
+            <Tab1Ingestion baseline={baseline} onRefreshBaseline={loadBaseline} />
+          )}
+          {activeTab === 'tab2' && (
+            <Tab2AnalyticsBI config={config} onChangeConfig={updateConfig} />
+          )}
+          {activeTab === 'tab3' && (
+            <Tab3ModelLabShield config={config} onChangeConfig={updateConfig} />
+          )}
+        </main>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('tab2')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
-              activeTab === 'tab2'
-                ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            Tab 2 &mdash; Dynamic BI & Historical Explorer
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('tab3')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
-              activeTab === 'tab3'
-                ? 'border-cyan-400 text-cyan-400 bg-cyan-500/5'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <BrainCircuit className="w-4 h-4" />
-            Tab 3 &mdash; Model Lab & Live Market Shield
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {activeTab === 'tab1' && baseline && (
-          <Tab1Ingestion baseline={baseline} onRefreshBaseline={loadBaseline} />
-        )}
-        {activeTab === 'tab2' && (
-          <Tab2AnalyticsBI config={config} onChangeConfig={updateConfig} />
-        )}
-        {activeTab === 'tab3' && (
-          <Tab3ModelLabShield config={config} onChangeConfig={updateConfig} />
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 px-6 text-center text-xs text-slate-500">
-        Arkadanta &bull; Dynamic Big Data Intelligence Pipeline (Mata Kuliah Big Data & Analitik)
-        &bull; Keluaran prediksi hanya untuk analitik akademik, bukan rekomendasi investasi.
-      </footer>
+        {/* Black Dashboard Footer */}
+        <footer className="px-6 py-5 flex flex-wrap items-center justify-between text-xs text-[#9a9a9a] border-t border-white/5 mt-6">
+          <div className="flex items-center gap-4">
+            <span className="text-white font-normal">ARKADANTA</span>
+            <span>Big Data &amp; Analytics Final Project</span>
+            <span>Lambda Architecture (HDFS &bull; PySpark &bull; FastAPI)</span>
+          </div>
+          <div>
+            <span>Academic Quantitative Risk Analysis &mdash; Non-Advisory Output</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 };

@@ -15,7 +15,13 @@ from backend.config import (
     HDFS_BASE_PATH,
 )
 from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
-from backend.schemas import IngestionAuditReport, LiveSyncRequest
+from backend.schemas import (
+    CronConfigRequest,
+    CronStatusResponse,
+    IngestionAuditReport,
+    LiveSyncRequest,
+)
+from backend.scheduler import cron_scheduler
 from data.sample_generator import (
     ensure_sample_data_exists,
     generate_synthetic_5m_ohlcv,
@@ -48,90 +54,27 @@ async def upload_dataset(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/api/ingestion/cron-status", response_model=CronStatusResponse)
+def get_cron_status():
+    """Mengambil status background cron scheduler untuk sinkronisasi live data."""
+    return cron_scheduler.get_status()
+
+
+@router.post("/api/ingestion/cron-config", response_model=CronStatusResponse)
+def configure_cron(req: CronConfigRequest):
+    """Mengaktifkan/menonaktifkan atau mengatur interval waktu background cron job."""
+    return cron_scheduler.configure(
+        enabled=req.enabled,
+        interval_minutes=req.interval_minutes,
+        symbols=req.symbols,
+        limit=req.limit,
+    )
+
+
 @router.post("/api/ingestion/live-sync")
 def sync_live_binance(req: LiveSyncRequest):
-    """Menarik candle 5 menit terbaru dari Binance API (/api/v3/klines) dengan fallback sintetis jika offline."""
-    synced_reports = []
-    for sym in req.symbols:
-        symbol = sym.upper()
-        source_mode = "BINANCE_API"
-        try:
-            resp = requests.get(
-                BINANCE_KLINES_URL,
-                params={"symbol": symbol, "interval": req.interval, "limit": req.limit},
-                timeout=6,
-            )
-            resp.raise_for_status()
-            raw_klines = resp.json()
-            rows = []
-            for k in raw_klines:
-                rows.append(
-                    {
-                        "timestamp": pd.to_datetime(int(k[0]), unit="ms", utc=True),
-                        "coin_symbol": symbol,
-                        "open": float(k[1]),
-                        "high": float(k[2]),
-                        "low": float(k[3]),
-                        "close": float(k[4]),
-                        "volume": float(k[5]),
-                        "quote_asset_volume": float(k[7]),
-                        "number_of_trades": int(k[8]),
-                        "taker_buy_base_volume": float(k[9]),
-                        "taker_buy_quote_volume": float(k[10]),
-                    }
-                )
-            df_new = pd.DataFrame(rows)
-        except Exception:
-            source_mode = "CSV"
-            df_new = generate_synthetic_5m_ohlcv(symbol=symbol, n_candles=req.limit)
-
-        # Gabungkan dengan historis yang ada di drop_zone
-        existing_path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
-        if existing_path.exists():
-            df_old = load_clean_ohlcv(symbol)
-            rows_before = len(df_old) + len(df_new)
-            df_merged = (
-                pd.concat([df_old, df_new], ignore_index=True)
-                .sort_values("timestamp")
-                .drop_duplicates(subset=["coin_symbol", "timestamp"], keep="last")
-                .reset_index(drop=True)
-            )
-        else:
-            rows_before = len(df_new)
-            df_merged = df_new
-
-        df_merged.to_csv(existing_path, index=False)
-        dups = max(0, rows_before - len(df_merged))
-
-        rep = IngestionAuditReport(
-            run_id=f"sync_{uuid.uuid4().hex[:8]}",
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            source_name=f"Binance /api/v3/klines ({symbol} {req.interval})",
-            format_detected=source_mode,
-            selected_pipeline="BinanceKlineFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
-            column_mapping={"open_time": "timestamp", "symbol": "coin_symbol"},
-            symbols_detected=[symbol],
-            rows_before=rows_before,
-            rows_after=len(df_merged),
-            duplicates_removed=dups,
-            imputed_ohlc_rows=0,
-            imputed_volume_rows=0,
-            rejected_rows=0,
-            error_reasons={
-                "high_less_than_low": 0,
-                "non_positive_price": 0,
-                "negative_volume": 0,
-                "invalid_timestamp": 0,
-            },
-            drop_zone_path=f"data/drop_zone/{existing_path.name}",
-            hdfs_target_path=f"{HDFS_BASE_PATH}symbol={symbol}/",
-            nifi_hdfs_status="SYNCED",
-            quality_score_pct=100.0,
-        )
-        synced_reports.append(rep.model_dump())
-
-    logs = load_audit_logs()
-    save_audit_logs((synced_reports + logs)[:50])
+    """Menarik candle 5 menit terbaru secara manual dari Binance API (/api/v3/klines)."""
+    synced_reports = cron_scheduler.trigger_sync(symbols=req.symbols, limit=req.limit)
     return {"status": "ok", "synced_assets": len(synced_reports), "reports": synced_reports}
 
 

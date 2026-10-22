@@ -1,22 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CheckCircle2,
-  CloudDownload,
+  Clock,
   Database,
   FileSpreadsheet,
   HardDrive,
+  Play,
   RefreshCw,
   ShieldCheck,
+  StopCircle,
   UploadCloud,
-  AlertTriangle,
 } from 'lucide-react';
 import {
+  CronStatus,
   HistoricalBaselineResponse,
   IngestionAuditReport,
 } from '../types/arkadanta';
 import {
+  fetchCronStatus,
   SUPPORTED_SYMBOLS,
   triggerBinanceLiveSync,
+  updateCronConfig,
   uploadDatasetFile,
 } from '../services/api';
 
@@ -24,6 +28,15 @@ interface Props {
   baseline: HistoricalBaselineResponse;
   onRefreshBaseline: () => void;
 }
+
+const INTERVAL_PRESETS = [
+  { label: '5m (1 Candle)', value: 5 },
+  { label: '15m', value: 15 },
+  { label: '25m', value: 25 },
+  { label: '1h (60m)', value: 60 },
+  { label: '4h (240m)', value: 240 },
+  { label: '1d (1440m)', value: 1440 },
+];
 
 export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -38,6 +51,79 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
   );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const [cronStatus, setCronStatus] = useState<CronStatus>({
+    enabled: false,
+    interval_minutes: 5,
+    symbols: SUPPORTED_SYMBOLS,
+    limit: 60,
+    last_run: null,
+    next_run: null,
+    last_status: 'IDLE',
+    last_synced_count: 0,
+    total_runs: 0,
+  });
+  const [selectedInterval, setSelectedInterval] = useState<number>(5);
+  const [isCustomInterval, setIsCustomInterval] = useState<boolean>(false);
+  const [customIntervalValue, setCustomIntervalValue] = useState<number>(5);
+  const [cronLoading, setCronLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadStatus = async () => {
+      const res = await fetchCronStatus();
+      if (active) {
+        setCronStatus(res);
+        setSelectedInterval(res.interval_minutes);
+        const matchPreset = INTERVAL_PRESETS.some((p) => p.value === res.interval_minutes);
+        setIsCustomInterval(!matchPreset);
+        if (!matchPreset) setCustomIntervalValue(res.interval_minutes);
+      }
+    };
+    loadStatus();
+    const timer = setInterval(loadStatus, 4000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const handleToggleCron = async () => {
+    setCronLoading(true);
+    setStatusMessage(null);
+    try {
+      const interval = isCustomInterval ? customIntervalValue : selectedInterval;
+      const res = await updateCronConfig(
+        !cronStatus.enabled,
+        interval,
+        selectedSyncSymbols,
+        60
+      );
+      setCronStatus(res);
+      setStatusMessage(
+        res.enabled
+          ? `Automated Cron Scheduler enabled (Every ${res.interval_minutes} minutes).`
+          : 'Automated Cron Scheduler stopped. Manual synchronization remains available.'
+      );
+    } finally {
+      setCronLoading(false);
+    }
+  };
+
+  const handleIntervalChange = async (newInterval: number, custom = false) => {
+    setIsCustomInterval(custom);
+    if (!custom) setSelectedInterval(newInterval);
+    if (cronStatus.enabled) {
+      setCronLoading(true);
+      try {
+        const res = await updateCronConfig(true, newInterval, selectedSyncSymbols, 60);
+        setCronStatus(res);
+        setStatusMessage(`Cron interval updated to ${newInterval} minutes.`);
+      } finally {
+        setCronLoading(false);
+      }
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -47,11 +133,11 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
       const report = await uploadDatasetFile(selectedFile, defaultSymbol, customMapping);
       setLatestReport(report);
       setStatusMessage(
-        `Berhasil memproses ${report.source_name} — Skor Kualitas: ${report.quality_score_pct}% (${report.rows_after}/${report.rows_before} baris valid)`
+        `Processed ${report.source_name} — Data Quality Score: ${report.quality_score_pct}% (${report.rows_after}/${report.rows_before} valid rows)`
       );
       onRefreshBaseline();
     } catch (err: any) {
-      setStatusMessage(`Error: ${err.message || 'Gagal mengunggah file'}`);
+      setStatusMessage(`Error: ${err.message || 'Upload failed'}`);
     } finally {
       setUploading(false);
     }
@@ -67,7 +153,7 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
         setLatestReport(res.reports[0]);
       }
       setStatusMessage(
-        `Sinkronisasi Binance /api/v3/klines berhasil untuk ${res.synced_assets} aset (${syncLimit} candle 5m)!`
+        `Manual Binance synchronization completed for ${res.synced_assets} assets (${syncLimit} 5m candles).`
       );
       onRefreshBaseline();
     } finally {
@@ -84,338 +170,420 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
   const activeAudit = latestReport || baseline.audit_logs[0];
 
   return (
-    <div className="space-y-6">
-      {/* Top Status Banner (Kontrak Integrasi Orang 1) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 flex items-center justify-between shadow-lg">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-              Status Pipeline Orang 1
-            </p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-2xl font-bold text-white">{baseline.pipeline_status}</span>
+    <div>
+      {/* Top 3 Summary Cards (Pipeline Status, HDFS Target, Data Quality Score) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bd-card">
+          <div className="bd-card-body flex items-center justify-between !py-5">
+            <div className="w-11 h-11 rounded-full bg-[#00f2c3]/15 flex items-center justify-center text-[#00f2c3]">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-            <p className="text-xs text-emerald-400 mt-1">
-              Dynamic Pipeline Controller Ready
-            </p>
+            <div className="text-right">
+              <p className="bd-card-category">Pipeline Controller Status</p>
+              <h3 className="bd-card-title !text-xl">{baseline.pipeline_status}</h3>
+            </div>
           </div>
-          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-        </div>
-
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 flex items-center justify-between shadow-lg">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-              Target Cluster Apache NiFi &rarr; HDFS
-            </p>
-            <p className="text-sm font-mono font-semibold text-cyan-400 mt-1.5 break-all">
-              {baseline.hdfs_cluster_path}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Partisi: symbol / year / month / timeframe
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-            <HardDrive className="w-7 h-7" />
+          <div className="px-5 py-2.5 border-t border-white/5 text-xs text-[#9a9a9a]">
+            Rule-Based Schema &amp; Sanity Guard Active
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 flex items-center justify-between shadow-lg">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-              Skor Kualitas Data Terakhir
-            </p>
-            <p className="text-2xl font-bold text-white mt-1">
-              {activeAudit ? `${activeAudit.quality_score_pct}%` : '99.1%'}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              {activeAudit
-                ? `${activeAudit.rows_after.toLocaleString()} baris lolos sanity check`
-                : 'Semua skema OHLCV tervalidasi'}
-            </p>
+        <div className="bd-card">
+          <div className="bd-card-body flex items-center justify-between !py-5">
+            <div className="w-11 h-11 rounded-full bg-[#1d8cf8]/15 flex items-center justify-center text-[#1d8cf8]">
+              <HardDrive className="w-5 h-5" />
+            </div>
+            <div className="text-right">
+              <p className="bd-card-category">Apache NiFi PutHDFS Target</p>
+              <h3 className="text-sm font-mono text-white mt-1">
+                {baseline.hdfs_cluster_path}
+              </h3>
+            </div>
           </div>
-          <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-            <Database className="w-7 h-7" />
+          <div className="px-5 py-2.5 border-t border-white/5 text-xs text-[#9a9a9a]">
+            Partitioned by symbol / year / month / timeframe
+          </div>
+        </div>
+
+        <div className="bd-card">
+          <div className="bd-card-body flex items-center justify-between !py-5">
+            <div className="w-11 h-11 rounded-full bg-[#e14eca]/15 flex items-center justify-center text-[#e14eca]">
+              <Database className="w-5 h-5" />
+            </div>
+            <div className="text-right">
+              <p className="bd-card-category">Latest Data Quality Score</p>
+              <h3 className="bd-card-title !text-xl">
+                {activeAudit ? `${activeAudit.quality_score_pct}%` : '99.1%'}
+              </h3>
+            </div>
+          </div>
+          <div className="px-5 py-2.5 border-t border-white/5 text-xs text-[#9a9a9a]">
+            {activeAudit
+              ? `${activeAudit.rows_after.toLocaleString()} clean OHLCV records verified`
+              : 'All standard OHLCV checks passed'}
           </div>
         </div>
       </div>
 
       {statusMessage && (
-        <div className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-4 py-3 rounded-xl text-sm flex items-center gap-2.5">
-          <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0" />
-          <span>{statusMessage}</span>
+        <div className="bd-card !mb-6 border-l-4 !border-l-[#00f2c3]">
+          <div className="px-5 py-3.5 flex items-center gap-3 text-xs text-white">
+            <CheckCircle2 className="w-4 h-4 text-[#00f2c3] shrink-0" />
+            <span>{statusMessage}</span>
+          </div>
         </div>
       )}
 
-      {/* Upload & Live Sync Forms */}
+      {/* Batch Upload + Speed Layer Cron/Manual Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Upload CSV / JSON */}
-        <form
-          onSubmit={handleUpload}
-          className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-xl p-6 space-y-4 shadow-lg"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <UploadCloud className="w-5 h-5 text-cyan-400" />
-              <h3 className="text-base font-semibold text-white">
-                Batch Ingestion: Upload CSV / JSON & Mapping Skema
+        {/* Batch Layer: CSV/JSON Upload */}
+        <form onSubmit={handleUpload} className="lg:col-span-6 bd-card flex flex-col justify-between">
+          <div>
+            <div className="bd-card-header flex items-center justify-between">
+              <div>
+                <h5 className="bd-card-category">Batch Layer Ingestion</h5>
+                <h3 className="bd-card-title !text-lg">CSV / JSON Dataset Upload</h3>
+              </div>
+              <span className="text-xs font-mono text-[#1d8cf8]">Auto Format Detector</span>
+            </div>
+
+            <div className="bd-card-body space-y-4">
+              <label className="block border border-dashed border-[#2b3553] hover:border-[#1d8cf8] transition rounded-[0.4285rem] p-6 text-center cursor-pointer bg-[#1e1e2f]">
+                <input
+                  type="file"
+                  accept=".csv,.json"
+                  className="hidden"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                />
+                <FileSpreadsheet className="w-7 h-7 text-[#1d8cf8] mx-auto mb-2" />
+                {selectedFile ? (
+                  <div>
+                    <p className="text-sm font-medium text-[#00f2c3]">{selectedFile.name}</p>
+                    <p className="text-xs text-[#9a9a9a] mt-0.5">
+                      {(selectedFile.size / 1024).toFixed(1)} KB &mdash; Ready for Dynamic Pipeline
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs text-white font-normal">
+                      Select raw <span className="text-[#1d8cf8]">.CSV</span> or{' '}
+                      <span className="text-[#1d8cf8]">.JSON</span> file to ingest
+                    </p>
+                    <p className="text-[11px] text-[#9a9a9a] mt-1">
+                      Automatic alias resolution (open_time &rarr; timestamp, vol &rarr; volume)
+                    </p>
+                  </div>
+                )}
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                    Default Asset Symbol
+                  </label>
+                  <select
+                    value={defaultSymbol}
+                    onChange={(e) => setDefaultSymbol(e.target.value)}
+                    className="bd-input w-full"
+                  >
+                    {SUPPORTED_SYMBOLS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[#9a9a9a] mb-1">
+                    Custom Column Mapping (Optional JSON)
+                  </label>
+                  <input
+                    type="text"
+                    value={customMapping}
+                    onChange={(e) => setCustomMapping(e.target.value)}
+                    placeholder='{"open_time": "timestamp", "vol": "volume"}'
+                    className="bd-input w-full font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 pb-5">
+            <button
+              type="submit"
+              disabled={!selectedFile || uploading}
+              className="bd-btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-40"
+            >
+              <UploadCloud className="w-4 h-4" />
+              {uploading ? 'Validating & Normalizing...' : 'Run Dynamic Ingestion Pipeline'}
+            </button>
+          </div>
+        </form>
+
+        {/* Speed Layer: Background Cron Scheduler & Manual Binance Sync */}
+        <div className="lg:col-span-6 bd-card">
+          <div className="bd-card-header flex items-center justify-between">
+            <div>
+              <h5 className="bd-card-category">Speed Layer (/api/v3/klines)</h5>
+              <h3 className="bd-card-title !text-lg">
+                Automated Cron Scheduler &amp; Manual Sync
               </h3>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-              Auto Format Detector
+            <span
+              className={`px-2.5 py-1 rounded text-xs font-mono border ${
+                cronStatus.enabled
+                  ? 'border-[#00f2c3] text-[#00f2c3] bg-[#00f2c3]/10'
+                  : 'border-[#2b3553] text-[#9a9a9a] bg-[#1e1e2f]'
+              }`}
+            >
+              {cronStatus.enabled ? `CRON ON (${cronStatus.interval_minutes}m)` : 'CRON IDLE'}
             </span>
           </div>
 
-          <label className="block border-2 border-dashed border-slate-700 hover:border-cyan-500/60 transition rounded-xl p-6 text-center cursor-pointer bg-slate-950/50">
-            <input
-              type="file"
-              accept=".csv,.json"
-              className="hidden"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-            />
-            <FileSpreadsheet className="w-9 h-9 text-cyan-400 mx-auto mb-2" />
-            {selectedFile ? (
-              <div>
-                <p className="text-sm font-semibold text-emerald-400">{selectedFile.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {(selectedFile.size / 1024).toFixed(1)} KB — Siap divalidasi oleh Dynamic Pipeline Controller
-                </p>
+          <div className="bd-card-body space-y-4">
+            {/* Cron Controls Box */}
+            <div className="bg-[#1e1e2f] border border-[#2b3553] rounded-[0.4285rem] p-4 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-white">
+                  <Clock className="w-4 h-4 text-[#1d8cf8]" />
+                  <span>Background Periodic Synchronization</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleCron}
+                  disabled={cronLoading}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition flex items-center gap-1.5 border ${
+                    cronStatus.enabled
+                      ? 'border-[#fd5d93] text-[#fd5d93] hover:bg-[#fd5d93]/10'
+                      : 'border-[#00f2c3] text-[#00f2c3] hover:bg-[#00f2c3]/10'
+                  }`}
+                >
+                  {cronStatus.enabled ? (
+                    <>
+                      <StopCircle className="w-3.5 h-3.5" /> Stop Cron
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5" /> Enable Auto Cron
+                    </>
+                  )}
+                </button>
               </div>
-            ) : (
-              <div>
-                <p className="text-sm text-slate-200 font-medium">
-                  Klik untuk memilih file <span className="text-cyan-400">.CSV</span> atau{' '}
-                  <span className="text-cyan-400">.JSON</span>
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Mendukung pencocokan alias kolom otomatis (open_time &rarr; timestamp, vol &rarr; volume)
-                </p>
-              </div>
-            )}
-          </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">
-                Simbol Default (bila kolom coin_symbol kosong)
-              </label>
-              <select
-                value={defaultSymbol}
-                onChange={(e) => setDefaultSymbol(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              >
-                {SUPPORTED_SYMBOLS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">
-                Custom Column Mapping (JSON Opsional)
-              </label>
-              <input
-                type="text"
-                value={customMapping}
-                onChange={(e) => setCustomMapping(e.target.value)}
-                placeholder='{"open_time": "timestamp", "vol": "volume"}'
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyan-500"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!selectedFile || uploading}
-            className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 text-white font-semibold text-sm transition flex items-center justify-center gap-2 shadow-md"
-          >
-            {uploading ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Memvalidasi & Menormalisasi Data...
-              </>
-            ) : (
-              <>
-                <UploadCloud className="w-4 h-4" />
-                Jalankan Dynamic Pipeline & Simpan ke Drop Zone
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Speed Layer: Binance API Sync */}
-        <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-xl p-6 flex flex-col justify-between shadow-lg">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <CloudDownload className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-semibold text-white">
-                  Speed Layer: Binance API Live Sync
-                </h3>
-              </div>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
-                /api/v3/klines
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Menarik candle 5 menit terbaru langsung dari endpoint publik Binance, menjalankan
-              deduplikasi timestamp, dan memperbarui partisi data bersih untuk inferensi real-time.
-            </p>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-2">
-                Pilih Pasangan Aset Kripto
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {SUPPORTED_SYMBOLS.map((sym) => {
-                  const active = selectedSyncSymbols.includes(sym);
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {INTERVAL_PRESETS.map((p) => {
+                  const selected = !isCustomInterval && selectedInterval === p.value;
                   return (
                     <button
+                      key={p.value}
                       type="button"
-                      key={sym}
-                      onClick={() => toggleSyncSymbol(sym)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-                        active
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      onClick={() => handleIntervalChange(p.value, false)}
+                      className={`py-1.5 px-2 rounded text-[11px] font-mono border transition ${
+                        selected
+                          ? 'border-[#1d8cf8] bg-[#1d8cf8]/20 text-white'
+                          : 'border-[#2b3553] text-[#9a9a9a] hover:text-white'
                       }`}
                     >
-                      {sym}
+                      {p.label}
                     </button>
                   );
                 })}
               </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-white/5 text-xs">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleIntervalChange(customIntervalValue, true)}
+                    className={`px-2.5 py-1 rounded text-[11px] border ${
+                      isCustomInterval
+                        ? 'border-[#1d8cf8] text-[#1d8cf8]'
+                        : 'border-[#2b3553] text-[#9a9a9a]'
+                    }`}
+                  >
+                    Custom (min):
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={customIntervalValue}
+                    onChange={(e) => {
+                      const val = Math.max(1, Number(e.target.value) || 1);
+                      setCustomIntervalValue(val);
+                      if (isCustomInterval) handleIntervalChange(val, true);
+                    }}
+                    className="bd-input !w-20 !py-1 font-mono"
+                  />
+                </div>
+
+                <div className="text-[11px] text-[#9a9a9a] font-mono">
+                  Next Run:{' '}
+                  <span className="text-white">
+                    {cronStatus.enabled && cronStatus.next_run
+                      ? cronStatus.next_run.slice(11, 19) + ' UTC'
+                      : 'Manual Mode'}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-slate-400">Jumlah Candle 5m per Aset</span>
-                <span className="text-amber-400 font-semibold">{syncLimit} candles</span>
+            {/* Manual Trigger Controls */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-[#9a9a9a]">Target Assets:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SUPPORTED_SYMBOLS.map((sym) => {
+                    const active = selectedSyncSymbols.includes(sym);
+                    return (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={() => toggleSyncSymbol(sym)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono border transition ${
+                          active
+                            ? 'border-[#1d8cf8] bg-[#1d8cf8]/20 text-white'
+                            : 'border-[#2b3553] text-[#9a9a9a]'
+                        }`}
+                      >
+                        {sym}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <input
-                type="range"
-                min={100}
-                max={1000}
-                step={50}
-                value={syncLimit}
-                onChange={(e) => setSyncLimit(Number(e.target.value))}
-                className="w-full accent-amber-500"
-              />
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#9a9a9a]">Candles Limit:</span>
+                  <input
+                    type="number"
+                    step={50}
+                    min={50}
+                    max={1000}
+                    value={syncLimit}
+                    onChange={(e) => setSyncLimit(Number(e.target.value) || 300)}
+                    className="bd-input !w-24 !py-1.5 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLiveSync}
+                  disabled={syncing || selectedSyncSymbols.length === 0}
+                  className="bd-btn-teal flex items-center gap-2 disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Synchronizing...' : 'Manual Sync Now'}
+                </button>
+              </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleLiveSync}
-            disabled={syncing || selectedSyncSymbols.length === 0}
-            className="mt-6 w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 disabled:opacity-40 text-slate-950 font-bold text-sm transition flex items-center justify-center gap-2 shadow-md"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Menyinkronkan Candle Live...' : 'Sinkronkan Data Live Binance Sekarang'}
-          </button>
         </div>
       </div>
 
-      {/* Audit Detail Card from Orang 1 */}
+      {/* Audit Log Inspection Card (Output Orang 1) */}
       {activeAudit && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-lg space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="bd-card">
+          <div className="bd-card-header flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-cyan-400" />
-                Inspeksi Audit Preprocessing & Validasi Skema (Output Orang 1)
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Alur Terpilih:{' '}
-                <span className="font-mono text-cyan-300">{activeAudit.selected_pipeline}</span>
-              </p>
+              <h5 className="bd-card-category">Data Veracity &amp; Preprocessing Audit</h5>
+              <h4 className="bd-card-title !text-base">
+                Pipeline Execution: <span className="font-mono text-sm text-[#1d8cf8]">{activeAudit.selected_pipeline}</span>
+              </h4>
             </div>
-            <span className="text-xs font-mono px-3 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              NiFi/HDFS: {activeAudit.nifi_hdfs_status}
+            <span className="text-xs font-mono text-[#00f2c3]">
+              NiFi/HDFS Status: {activeAudit.nifi_hdfs_status}
             </span>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Format Input</p>
-              <p className="text-lg font-bold text-white mt-0.5">{activeAudit.format_detected}</p>
-            </div>
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Baris Masuk</p>
-              <p className="text-lg font-bold text-white mt-0.5">
-                {activeAudit.rows_before.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Baris Bersih</p>
-              <p className="text-lg font-bold text-emerald-400 mt-0.5">
-                {activeAudit.rows_after.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Duplikat Dihapus</p>
-              <p className="text-lg font-bold text-amber-400 mt-0.5">
-                {activeAudit.duplicates_removed}
-              </p>
-            </div>
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Imputasi (FFill / Vol)</p>
-              <p className="text-lg font-bold text-cyan-400 mt-0.5">
-                {activeAudit.imputed_ohlc_rows + activeAudit.imputed_volume_rows}
-              </p>
-            </div>
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <p className="text-[11px] text-slate-400">Baris Ditolak (Invalid)</p>
-              <p className="text-lg font-bold text-rose-400 mt-0.5">{activeAudit.rejected_rows}</p>
+          <div className="bd-card-body">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Detected Format</span>
+                <span className="text-base font-mono font-semibold text-white mt-0.5 block">
+                  {activeAudit.format_detected}
+                </span>
+              </div>
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Raw Input Rows</span>
+                <span className="text-base font-mono font-semibold text-white mt-0.5 block">
+                  {activeAudit.rows_before.toLocaleString()}
+                </span>
+              </div>
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Clean Output Rows</span>
+                <span className="text-base font-mono font-semibold text-[#00f2c3] mt-0.5 block">
+                  {activeAudit.rows_after.toLocaleString()}
+                </span>
+              </div>
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Duplicates Removed</span>
+                <span className="text-base font-mono font-semibold text-[#ff8d72] mt-0.5 block">
+                  {activeAudit.duplicates_removed}
+                </span>
+              </div>
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Imputed (FFill / Vol)</span>
+                <span className="text-base font-mono font-semibold text-[#1d8cf8] mt-0.5 block">
+                  {activeAudit.imputed_ohlc_rows + activeAudit.imputed_volume_rows}
+                </span>
+              </div>
+              <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
+                <span className="text-[11px] text-[#9a9a9a] block">Rejected Invalid Rows</span>
+                <span className="text-base font-mono font-semibold text-[#fd5d93] mt-0.5 block">
+                  {activeAudit.rejected_rows}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tabel Ketersediaan Baseline Historis */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-lg">
-        <h3 className="text-base font-semibold text-white mb-4">
-          Ketersediaan Baseline Data Historis 5 Menit & Partisi HDFS
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase">
-                <th className="py-3 px-4">Simbol Aset</th>
-                <th className="py-3 px-4">Total Baris (5m)</th>
-                <th className="py-3 px-4">Harga Penutupan Terakhir</th>
-                <th className="py-3 px-4">Rata-Rata Volume (5m)</th>
-                <th className="py-3 px-4">Path Partisi HDFS</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {baseline.assets.map((asset) => (
-                <tr key={asset.symbol} className="hover:bg-slate-800/40 transition">
-                  <td className="py-3 px-4 font-bold text-white">{asset.symbol}</td>
-                  <td className="py-3 px-4 text-slate-300">{asset.rows_5m.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-emerald-400 font-mono">
-                    ${asset.latest_close.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 text-slate-300 font-mono">
-                    {asset.avg_volume_5m.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 text-xs font-mono text-cyan-400">
-                    {asset.hdfs_partition}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      {asset.status}
-                    </span>
-                  </td>
+      {/* Historical Baseline Partitions Table */}
+      <div className="bd-card">
+        <div className="bd-card-header">
+          <h5 className="bd-card-category">Clean OHLCV Storage</h5>
+          <h4 className="bd-card-title !text-base">
+            5-Minute Baseline Partitions &amp; HDFS Paths
+          </h4>
+        </div>
+        <div className="bd-card-body">
+          <div className="overflow-x-auto">
+            <table className="bd-table">
+              <thead>
+                <tr>
+                  <th className="text-left">Asset Symbol</th>
+                  <th className="text-right">Clean Rows (5m)</th>
+                  <th className="text-right">Latest Close</th>
+                  <th className="text-right">Mean Volume (5m)</th>
+                  <th className="text-left">HDFS Partition Directory</th>
+                  <th className="text-right">State</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {baseline.assets.map((asset) => (
+                  <tr key={asset.symbol}>
+                    <td className="font-semibold text-white">{asset.symbol}</td>
+                    <td className="text-right font-mono">{asset.rows_5m.toLocaleString()}</td>
+                    <td className="text-right font-mono text-[#00f2c3]">
+                      ${asset.latest_close.toLocaleString()}
+                    </td>
+                    <td className="text-right font-mono text-[#9a9a9a]">
+                      {asset.avg_volume_5m.toLocaleString()}
+                    </td>
+                    <td className="font-mono text-xs text-[#1d8cf8]">
+                      {asset.hdfs_partition}
+                    </td>
+                    <td className="text-right">
+                      <span className="text-xs font-mono text-[#00f2c3]">{asset.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
