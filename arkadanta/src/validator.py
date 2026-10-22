@@ -1,53 +1,69 @@
 import pandas as pd
 
-from src.schema import NUMERIC_COLUMNS
+from src.schema import REQUIRED_COLUMNS, NUMERIC_COLUMNS
 
 
 def validate_data(df):
-    errors = []
+    messages = []
 
-    # Periksa nilai kosong
-    if df.isnull().any().any():
-        errors.append("Data mengandung nilai kosong")
+    # Terima alias asset dari data sampel lama.
+    if "coin_symbol" not in df.columns and "asset" in df.columns:
+        df = df.copy()
+        df["coin_symbol"] = df["asset"]
 
-    # Periksa nilai numerik
-    for column in NUMERIC_COLUMNS:
-        converted = pd.to_numeric(
-            df[column], errors="coerce"
+    missing_columns = [
+        column for column in REQUIRED_COLUMNS
+        if column not in df.columns
+    ]
+
+    if missing_columns:
+        messages.append(
+            f"Kolom wajib tidak tersedia: {missing_columns}"
         )
+        return False, messages
 
-        if converted.isnull().any():
-            errors.append(
-                f"Kolom {column} mengandung nilai nonnumerik"
+    if df["timestamp"].isna().any():
+        messages.append("Terdapat timestamp kosong.")
+        return False, messages
+
+    timestamps = pd.to_datetime(df["timestamp"], errors="coerce")
+    if timestamps.isna().any():
+        messages.append("Format timestamp tidak valid.")
+        return False, messages
+
+    for column in NUMERIC_COLUMNS:
+        values = pd.to_numeric(df[column], errors="coerce")
+
+        if values.isna().any():
+            messages.append(
+                f"Kolom {column} memiliki nilai kosong atau nonnumerik."
             )
-        elif not converted.map(
-            lambda value: pd.notna(value)
-            and abs(value) != float("inf")
-        ).all():
-            errors.append(
-                f"Kolom {column} mengandung nilai tidak valid"
-            )
-        else:
-            df[column] = converted
+            return False, messages
 
-    if errors:
-        return False, errors
+        if not values.map(lambda value: pd.notna(value) and abs(value) != float("inf")).all():
+            messages.append(f"Kolom {column} memiliki nilai tidak valid.")
+            return False, messages
 
-    # Harga dan volume tidak boleh negatif
-    if (df[NUMERIC_COLUMNS] < 0).any().any():
-        errors.append("Harga atau volume bernilai negatif")
+    numeric_df = df[NUMERIC_COLUMNS].apply(
+        pd.to_numeric, errors="coerce"
+    )
 
-    # Validasi rentang harga candle
-    if (
-        (df["high"] < df["low"]).any()
-        or (df["high"] < df["open"]).any()
-        or (df["high"] < df["close"]).any()
-        or (df["low"] > df["open"]).any()
-        or (df["low"] > df["close"]).any()
-    ):
-        errors.append("Rentang harga candle tidak valid")
+    if (numeric_df[["open", "high", "low", "close"]] <= 0).any().any():
+        messages.append("Harga OHLC harus lebih besar dari nol.")
+        return False, messages
 
-    if errors:
-        return False, errors
+    if (numeric_df["volume"] < 0).any():
+        messages.append("Volume tidak boleh negatif.")
+        return False, messages
 
-    return True, ["Data valid"]
+    invalid_ohlc = (
+        (numeric_df["high"] < numeric_df[["open", "close", "low"]].max(axis=1))
+        | (numeric_df["low"] > numeric_df[["open", "close", "high"]].min(axis=1))
+    )
+
+    if invalid_ohlc.any():
+        messages.append("Terdapat candle dengan nilai OHLC tidak konsisten.")
+        return False, messages
+
+    messages.append("Data valid.")
+    return True, messages

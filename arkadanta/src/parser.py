@@ -1,8 +1,6 @@
 import pandas as pd
 from pathlib import Path
 
-from src.schema import REQUIRED_COLUMNS
-
 
 def parse_file(file_path):
     path = Path(file_path)
@@ -10,18 +8,20 @@ def parse_file(file_path):
 
     if extension == ".csv":
         df = pd.read_csv(path)
-
     elif extension == ".json":
         df = pd.read_json(path)
-
     else:
         raise ValueError(
             f"Format file tidak didukung: {extension}"
         )
 
+    required_columns = [
+        "timestamp", "open", "high", "low",
+        "close", "volume", "asset", "interval"
+    ]
+
     missing_columns = [
-        column
-        for column in REQUIRED_COLUMNS
+        column for column in required_columns
         if column not in df.columns
     ]
 
@@ -30,4 +30,4 @@ def parse_file(file_path):
             f"Kolom wajib tidak ditemukan: {missing_columns}"
         )
 
-    return df[REQUIRED_COLUMNS]
+    return df[required_columns]
