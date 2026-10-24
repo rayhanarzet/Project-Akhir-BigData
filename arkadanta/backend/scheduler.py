@@ -9,11 +9,9 @@ import pandas as pd
 
 from backend.config import BINANCE_KLINES_URL, DEFAULT_SYMBOLS, DROP_ZONE_DIR, HDFS_BASE_PATH
 from backend.schemas import IngestionAuditReport
-from data.sample_generator import (
-    generate_synthetic_5m_ohlcv,
-    load_audit_logs,
-    load_clean_ohlcv,
-    save_audit_logs,
+from data.storage import (
+    append_audit_logs,
+    save_clean_ohlcv,
 )
 import uuid
 
@@ -34,7 +32,8 @@ class BinanceCronScheduler:
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._sync_lock = threading.Lock()
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
@@ -84,6 +83,11 @@ class BinanceCronScheduler:
         self.next_run = nxt.isoformat()
 
     def trigger_sync(self, symbols: Optional[List[str]] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        # Jangan biarkan sinkronisasi manual dan cron menimpa file bersamaan.
+        with self._sync_lock:
+            return self._trigger_sync(symbols, limit)
+
+    def _trigger_sync(self, symbols: Optional[List[str]], limit: Optional[int]) -> List[Dict[str, Any]]:
         """Mengeksekusi penarikan data Binance untuk simbol terpilih (dapat dipanggil cron atau manual)."""
         target_symbols = symbols or self.symbols
         target_limit = limit or self.limit
@@ -100,8 +104,13 @@ class BinanceCronScheduler:
                 )
                 resp.raise_for_status()
                 raw_klines = resp.json()
+                if not isinstance(raw_klines, list) or not raw_klines:
+                    raise ValueError(f"Binance tidak mengembalikan candle untuk {symbol}")
                 rows = []
                 for k in raw_klines:
+                    # Candle berjalan hanya ditampilkan live; dataset ML memakai candle selesai.
+                    if int(k[6]) >= int(time.time() * 1000):
+                        continue
                     rows.append(
                         {
                             "timestamp": pd.to_datetime(int(k[0]), unit="ms", utc=True),
@@ -118,26 +127,20 @@ class BinanceCronScheduler:
                         }
                     )
                 df_new = pd.DataFrame(rows)
-            except Exception:
-                source_mode = "CSV"
-                df_new = generate_synthetic_5m_ohlcv(symbol=symbol, n_candles=target_limit)
+                if df_new.empty:
+                    raise ValueError("Belum ada candle selesai pada respons Binance")
+            except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
+                # Simpan bukti aset yang sudah selesai apabila aset berikutnya gagal.
+                if synced_reports:
+                    append_audit_logs(synced_reports)
+                with self._lock:
+                    self.last_status = f"ERROR: Binance {symbol}: {exc}"
+                    self.last_synced_count = len(synced_reports)
+                raise ValueError(f"Binance {symbol}: {exc}. {len(synced_reports)} aset sudah tersimpan; aset yang gagal tidak diubah") from exc
 
             existing_path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
-            if existing_path.exists():
-                df_old = load_clean_ohlcv(symbol)
-                rows_before = len(df_old) + len(df_new)
-                df_merged = (
-                    pd.concat([df_old, df_new], ignore_index=True)
-                    .sort_values("timestamp")
-                    .drop_duplicates(subset=["coin_symbol", "timestamp"], keep="last")
-                    .reset_index(drop=True)
-                )
-            else:
-                rows_before = len(df_new)
-                df_merged = df_new
-
-            df_merged.to_csv(existing_path, index=False)
-            dups = max(0, rows_before - len(df_merged))
+            rows_before, rows_after = save_clean_ohlcv(symbol, df_new)
+            dups = max(0, rows_before - rows_after)
 
             rep = IngestionAuditReport(
                 run_id=f"cron_{uuid.uuid4().hex[:8]}",
@@ -148,7 +151,7 @@ class BinanceCronScheduler:
                 column_mapping={"open_time": "timestamp", "symbol": "coin_symbol"},
                 symbols_detected=[symbol],
                 rows_before=rows_before,
-                rows_after=len(df_merged),
+                rows_after=rows_after,
                 duplicates_removed=dups,
                 imputed_ohlc_rows=0,
                 imputed_volume_rows=0,
@@ -159,15 +162,14 @@ class BinanceCronScheduler:
                     "negative_volume": 0,
                     "invalid_timestamp": 0,
                 },
-                drop_zone_path=f"data/drop_zone/{existing_path.name}",
+                drop_zone_path=f"data/research/drop_zone/{existing_path.name}",
                 hdfs_target_path=f"{HDFS_BASE_PATH}symbol={symbol}/",
-                nifi_hdfs_status="SYNCED",
+                nifi_hdfs_status="QUEUED_DROP_ZONE",
                 quality_score_pct=100.0,
             )
             synced_reports.append(rep.model_dump())
 
-        logs = load_audit_logs()
-        save_audit_logs((synced_reports + logs)[:50])
+        append_audit_logs(synced_reports)
         return synced_reports
 
     def _run_loop(self):

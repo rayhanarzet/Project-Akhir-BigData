@@ -35,7 +35,6 @@ if not exist "%ARKADANTA_DIR%frontend\node_modules" (
     popd
 )
 
-"%PY_EXE%" -c "import sys; sys.path.insert(0, r'%ARKADANTA_DIR%'); from data.sample_generator import ensure_sample_data_exists; ensure_sample_data_exists()"
 
 echo [1/3] Menjalankan FastAPI Backend di port 8000...
 start "Arkadanta - FastAPI Backend (8000)" /D "%ARKADANTA_DIR%" cmd /k ""%PY_EXE%" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"

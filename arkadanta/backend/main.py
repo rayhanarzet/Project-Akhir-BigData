@@ -1,6 +1,7 @@
 """FastAPI Server Utama Arkadanta (Serving Layer - Bab 3.3)."""
 
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Pastikan direktori arkadanta ada di sys.path untuk reloader spawn process
@@ -10,18 +11,28 @@ if str(ROOT_DIR) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from data.storage import ResearchDataError
 
 from backend.api.analytics_routes import router as analytics_router
 from backend.api.ingestion_routes import router as ingestion_router
 from backend.api.model_routes import router as model_router
 from backend.api.prediction_routes import router as prediction_router
+from backend.api.market_routes import router as market_router
+from backend.market_stream import market_stream
 from backend.config import AVAILABLE_FEATURES, DEFAULT_SYMBOLS, SUPPORTED_TIMEFRAMES
-from data.sample_generator import ensure_sample_data_exists
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    await market_stream.stop()
+
 
 app = FastAPI(
     title="Arkadanta Big Data Intelligence API",
     description="Dynamic Big Data Intelligence Pipeline untuk Analisis, Deteksi Anomali, dan Prediksi Risiko Volatilitas Pasar Kripto Berbasis Lambda Architecture",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -33,9 +44,9 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def on_startup():
-    ensure_sample_data_exists(DEFAULT_SYMBOLS)
+@app.exception_handler(ResearchDataError)
+async def research_data_error_handler(request, exc):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 @app.get("/")
@@ -53,3 +64,4 @@ app.include_router(ingestion_router)
 app.include_router(analytics_router)
 app.include_router(model_router)
 app.include_router(prediction_router)
+app.include_router(market_router)

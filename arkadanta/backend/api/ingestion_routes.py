@@ -22,9 +22,7 @@ from backend.schemas import (
     LiveSyncRequest,
 )
 from backend.scheduler import cron_scheduler
-from data.sample_generator import (
-    ensure_sample_data_exists,
-    generate_synthetic_5m_ohlcv,
+from data.storage import (
     load_audit_logs,
     load_clean_ohlcv,
     save_audit_logs,
@@ -74,16 +72,20 @@ def configure_cron(req: CronConfigRequest):
 @router.post("/api/ingestion/live-sync")
 def sync_live_binance(req: LiveSyncRequest):
     """Menarik candle 5 menit terbaru secara manual dari Binance API (/api/v3/klines)."""
-    synced_reports = cron_scheduler.trigger_sync(symbols=req.symbols, limit=req.limit)
+    try:
+        synced_reports = cron_scheduler.trigger_sync(symbols=req.symbols, limit=req.limit)
+    except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail=f"Sinkronisasi Binance gagal: {exc}. Data simulasi tidak digunakan.") from exc
     return {"status": "ok", "synced_assets": len(synced_reports), "reports": synced_reports}
 
 
 @router.get("/api/historical-baseline")
 def get_historical_baseline():
     """Mengembalikan ringkasan dataset per aset, status HDFS/NiFi, dan log audit validasi Orang 1."""
-    ensure_sample_data_exists(DEFAULT_SYMBOLS)
     assets_summary = []
     for sym in DEFAULT_SYMBOLS:
+        if not (DROP_ZONE_DIR / f"{sym}_5m_clean.csv").exists():
+            continue
         df = load_clean_ohlcv(sym)
         assets_summary.append(
             {
@@ -99,7 +101,7 @@ def get_historical_baseline():
         )
     logs = load_audit_logs()
     return {
-        "pipeline_status": "ONLINE",
+        "pipeline_status": "ONLINE" if assets_summary else "NO_DATA",
         "hdfs_cluster_path": HDFS_BASE_PATH,
         "assets": assets_summary,
         "audit_logs": logs[:20],

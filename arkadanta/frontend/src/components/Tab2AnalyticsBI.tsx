@@ -37,24 +37,29 @@ import {
 } from '../services/api';
 
 interface Props {
+  dataRevision: number;
   config: DynamicConfigPayload;
   onChangeConfig: (partial: Partial<DynamicConfigPayload>) => void;
 }
 
 type HeroChartMode = 'price' | 'volatility' | 'oscillator';
 
-export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => {
+export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig, dataRevision }) => {
   const [analytics, setAnalytics] = useState<AnalyticsRunResponse | null>(null);
   const [correlation, setCorrelation] = useState<CorrelationResponse | null>(null);
   const [heroMode, setHeroMode] = useState<HeroChartMode>('price');
   const [corrBase, setCorrBase] = useState<string>('BTCUSDT');
   const [corrTarget, setCorrTarget] = useState<string>('ETHUSDT');
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    Promise.all([
+    setError(null);
+    setAnalytics(null);
+    setCorrelation(null);
+    Promise.allSettled([
       runDynamicAnalyticsApi(config),
       fetchCrossAssetCorrelation(
         config.timeframe,
@@ -64,14 +69,17 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => 
       ),
     ]).then(([aRes, cRes]) => {
       if (!active) return;
-      setAnalytics(aRes);
-      setCorrelation(cRes);
+      if (aRes.status === 'fulfilled') setAnalytics(aRes.value);
+      if (cRes.status === 'fulfilled') setCorrelation(cRes.value);
+      const failures = [aRes, cRes].filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      if (failures.length) setError(failures.map((r) => String(r.reason?.message || r.reason)).join(' '));
       setLoading(false);
     });
     return () => {
       active = false;
     };
   }, [
+    dataRevision,
     config.symbol,
     config.timeframe,
     config.ma_period,
@@ -100,6 +108,7 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => 
 
   return (
     <div>
+      {error && <div role="alert" className="mb-4 p-4 border border-red-400 rounded text-red-300">{error}</div>}
       {/* ROW 1: BLACK DASHBOARD HERO PERFORMANCE CHART CARD */}
       <div className="bd-card">
         <div className="bd-card-header flex flex-wrap items-start justify-between gap-4">

@@ -11,7 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from pyspark.sql import SparkSession
 from backend.config import DEFAULT_FEATURES, DROP_ZONE_DIR
-from data.sample_generator import ensure_sample_data_exists
+from data.storage import load_clean_ohlcv
 from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
 from spark_jobs.feature_pipeline import spark_compute_features
 from spark_jobs.train_models import spark_train_and_evaluate
@@ -29,7 +29,7 @@ def run_batch_job(
     rsi_period: int = 14,
     rolling_window: int = 20,
 ) -> dict:
-    ensure_sample_data_exists([symbol])
+    load_clean_ohlcv(symbol)
     input_csv = str(DROP_ZONE_DIR / f"{symbol.upper()}_5m_clean.csv")
 
     spark = (

@@ -9,14 +9,14 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-        timeout: 6000,
-        proxyTimeout: 6000,
+        timeout: 120000,
+        proxyTimeout: 120000,
         configure: (proxy) => {
           // Hindari spam log ECONNREFUSED di terminal saat FastAPI belum dinyalakan
           proxy.on('error', (_err, _req, res) => {
             if (res && 'writeHead' in res && !res.headersSent) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ detail: 'FastAPI offline, using interactive fallback engine' }));
+              res.end(JSON.stringify({ detail: 'FastAPI tidak dapat dihubungi. Jalankan backend di port 8000.' }));
             }
           });
         },

@@ -58,14 +58,15 @@ def test_raw_binance_vision_headerless_csv():
 
 def test_analytics_ml_and_spark_centroid_parity():
     from data.sample_generator import generate_synthetic_5m_ohlcv
+    from backend.config import DROP_ZONE_DIR
 
     # Pastikan file drop_zone BTCUSDT punya cukup baris setelah test multi_symbol
     df_btc = generate_synthetic_5m_ohlcv("BTCUSDT", n_candles=600)
-    (BASE_DIR / "data" / "drop_zone" / "BTCUSDT_5m_clean.csv").write_text(
+    (DROP_ZONE_DIR / "BTCUSDT_5m_clean.csv").write_text(
         df_btc.to_csv(index=False), encoding="utf-8"
     )
     df_eth = generate_synthetic_5m_ohlcv("ETHUSDT", n_candles=600)
-    (BASE_DIR / "data" / "drop_zone" / "ETHUSDT_5m_clean.csv").write_text(
+    (DROP_ZONE_DIR / "ETHUSDT_5m_clean.csv").write_text(
         df_eth.to_csv(index=False), encoding="utf-8"
     )
 

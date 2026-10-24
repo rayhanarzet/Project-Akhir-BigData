@@ -70,6 +70,7 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
   useEffect(() => {
     let active = true;
     const loadStatus = async () => {
+      try {
       const res = await fetchCronStatus();
       if (active) {
         setCronStatus(res);
@@ -77,6 +78,12 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
         const matchPreset = INTERVAL_PRESETS.some((p) => p.value === res.interval_minutes);
         setIsCustomInterval(!matchPreset);
         if (!matchPreset) setCustomIntervalValue(res.interval_minutes);
+      }
+      } catch (err) {
+        if (active) {
+          setCronStatus((previous) => ({ ...previous, enabled: false, last_status: 'UNAVAILABLE', next_run: null }));
+          setStatusMessage(err instanceof Error ? err.message : 'Status scheduler tidak tersedia.');
+        }
       }
     };
     loadStatus();
@@ -104,6 +111,8 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
           ? `Automated Cron Scheduler enabled (Every ${res.interval_minutes} minutes).`
           : 'Automated Cron Scheduler stopped. Manual synchronization remains available.'
       );
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Konfigurasi scheduler gagal.');
     } finally {
       setCronLoading(false);
     }
@@ -118,6 +127,8 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
         const res = await updateCronConfig(true, newInterval, selectedSyncSymbols, 60);
         setCronStatus(res);
         setStatusMessage(`Cron interval updated to ${newInterval} minutes.`);
+      } catch (err) {
+        setStatusMessage(err instanceof Error ? err.message : 'Perubahan interval gagal.');
       } finally {
         setCronLoading(false);
       }
@@ -155,6 +166,10 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
       setStatusMessage(
         `Manual Binance synchronization completed for ${res.synced_assets} assets (${syncLimit} 5m candles).`
       );
+      onRefreshBaseline();
+    } catch (err) {
+      setLatestReport(null);
+      setStatusMessage(err instanceof Error ? err.message : 'Sinkronisasi Binance gagal.');
       onRefreshBaseline();
     } finally {
       setSyncing(false);
@@ -213,22 +228,21 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
             <div className="text-right">
               <p className="bd-card-category">Latest Data Quality Score</p>
               <h3 className="bd-card-title !text-xl">
-                {activeAudit ? `${activeAudit.quality_score_pct}%` : '99.1%'}
+                {activeAudit ? `${activeAudit.quality_score_pct}%` : 'Belum tersedia'}
               </h3>
             </div>
           </div>
           <div className="px-5 py-2.5 border-t border-white/5 text-xs text-[#9a9a9a]">
             {activeAudit
               ? `${activeAudit.rows_after.toLocaleString()} clean OHLCV records verified`
-              : 'All standard OHLCV checks passed'}
+              : 'Belum ada hasil validasi data penelitian'}
           </div>
         </div>
       </div>
 
       {statusMessage && (
-        <div className="bd-card !mb-6 border-l-4 !border-l-[#00f2c3]">
+        <div role="status" aria-live="polite" className="bd-card !mb-6 border-l-4 !border-l-[#1d8cf8]">
           <div className="px-5 py-3.5 flex items-center gap-3 text-xs text-white">
-            <CheckCircle2 className="w-4 h-4 text-[#00f2c3] shrink-0" />
             <span>{statusMessage}</span>
           </div>
         </div>

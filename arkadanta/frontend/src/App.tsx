@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Cpu,
@@ -14,13 +14,13 @@ import {
   HistoricalBaselineResponse,
 } from './types/arkadanta';
 import {
-  buildFallbackBaseline,
   fetchHistoricalBaseline,
   SUPPORTED_SYMBOLS,
 } from './services/api';
 import { Tab1Ingestion } from './components/Tab1Ingestion';
 import { Tab2AnalyticsBI } from './components/Tab2AnalyticsBI';
 import { Tab3ModelLabShield } from './components/Tab3ModelLabShield';
+import { LiveMarketPanel } from './components/LiveMarketPanel';
 
 type SidebarTheme = 'blue' | 'green' | 'primary';
 
@@ -35,9 +35,12 @@ export const App: React.FC = () => {
   const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>('blue');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [baseline, setBaseline] = useState<HistoricalBaselineResponse>(
-    () => buildFallbackBaseline()
+    { pipeline_status: 'UNKNOWN', hdfs_cluster_path: '', assets: [], audit_logs: [] }
   );
+  const [baselineError, setBaselineError] = useState<string | null>(null);
   const [isLiveBackend, setIsLiveBackend] = useState<boolean>(false);
+  const [dataRevision, setDataRevision] = useState(0);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [config, setConfig] = useState<DynamicConfigPayload>({
     symbol: 'BTCUSDT',
@@ -68,15 +71,31 @@ export const App: React.FC = () => {
     use_spark: false,
   });
 
-  const loadBaseline = async () => {
-    const res = await fetchHistoricalBaseline();
-    setBaseline(res.data);
-    setIsLiveBackend(res.isLiveBackend);
-  };
+  const loadBaseline = useCallback(async () => {
+    try {
+      const res = await fetchHistoricalBaseline();
+      setBaseline(res.data);
+      setIsLiveBackend(res.isLiveBackend);
+      setBaselineError(null);
+    } catch (err) {
+      setIsLiveBackend(false);
+      setBaseline({ pipeline_status: 'UNAVAILABLE', hdfs_cluster_path: '', assets: [], audit_logs: [] });
+      setBaselineError(err instanceof Error ? err.message : 'Data backend tidak tersedia.');
+    }
+  }, []);
+
+  const onCandleClosed = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      loadBaseline();
+      setDataRevision((value) => value + 1);
+    }, 750);
+  }, [loadBaseline]);
 
   useEffect(() => {
     loadBaseline();
-  }, []);
+    return () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); };
+  }, [loadBaseline]);
 
   const updateConfig = (partial: Partial<DynamicConfigPayload>) => {
     setConfig((prev) => ({ ...prev, ...partial }));
@@ -272,7 +291,7 @@ export const App: React.FC = () => {
               />
               <span className="text-[#9a9a9a]">Serving Layer:</span>
               <span className="font-medium text-white">
-                {isLiveBackend ? 'FastAPI Live (8000)' : 'Local Engine'}
+                {isLiveBackend ? 'FastAPI Live (8000)' : 'Backend belum terhubung'}
               </span>
             </div>
           </div>
@@ -280,14 +299,26 @@ export const App: React.FC = () => {
 
         {/* View Content */}
         <main className="flex-1 px-6 py-3">
+          <LiveMarketPanel symbol={config.symbol} onCandleClosed={onCandleClosed} />
+          {baselineError && (
+            <div role="alert" className="mb-4 p-4 border border-red-400 rounded text-red-300">
+              {baselineError}
+              <button type="button" onClick={loadBaseline} className="ml-3 underline">Coba lagi</button>
+            </div>
+          )}
+          {isLiveBackend && baseline.assets.length === 0 && (
+            <div role="status" className="mb-4 p-4 border border-amber-400 rounded text-amber-200">
+              Data penelitian belum tersedia. Buka Data Ingestion untuk sinkronisasi Binance atau unggah data nyata. Data lama tidak digunakan otomatis.
+            </div>
+          )}
           {activeTab === 'tab1' && baseline && (
             <Tab1Ingestion baseline={baseline} onRefreshBaseline={loadBaseline} />
           )}
           {activeTab === 'tab2' && (
-            <Tab2AnalyticsBI config={config} onChangeConfig={updateConfig} />
+            <Tab2AnalyticsBI config={config} onChangeConfig={updateConfig} dataRevision={dataRevision} />
           )}
           {activeTab === 'tab3' && (
-            <Tab3ModelLabShield config={config} onChangeConfig={updateConfig} />
+            <Tab3ModelLabShield config={config} onChangeConfig={updateConfig} dataRevision={dataRevision} />
           )}
         </main>
 

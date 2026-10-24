@@ -4,6 +4,61 @@
 
 ---
 
+## Mode Penelitian: Data Nyata
+
+Aplikasi tidak lagi membuat dataset sintetis saat startup, membaca data, atau ketika Binance gagal. Frontend menampilkan kegagalan API; grafik, metrik, prediksi, hasil unggah, dan status scheduler tidak mempunyai pengganti simulasi.
+
+- Data aktif: `data/research/drop_zone/`.
+- Model aktif: `data/research/models/`.
+- Audit aktif: `data/research/audit_logs.json`.
+- Data, model, dan audit lama di `data/drop_zone/`, `data/models/`, dan `data/audit_logs.json` tetap disimpan tetapi tidak digunakan otomatis karena asal datanya belum terverifikasi.
+- Cadangan lokal sebelum perubahan: `../backups/before-research-20261024-150944/data/`. Cadangan dan data penelitian tidak dimasukkan ke Git.
+- `data/sample_generator.py` hanya menyediakan generator untuk tes eksplisit; tes backend menggunakan direktori sementara.
+
+Setelah memperbarui kode, restart backend, Vite, dan Streamlit. Pada awalnya status `NO_DATA` adalah normal. Buka tab **Data Ingestion**, pilih aset, lalu **Manual Sync Now**, atau unggah CSV/JSON nyata yang sumbernya sudah Anda periksa. Jangan unggah kembali dataset lama yang belum diverifikasi. Streamlit menyediakan panel ambil/unggah data sebelum analisis.
+
+Sinkronisasi mengambil candle terbaru, belum histori satu tahun. Jika Binance gagal, data aset yang gagal tidak diganti; aset yang sudah berhasil pada permintaan yang sama tetap tersimpan dan tercatat di audit. Berkas lokal dilaporkan sebagai `QUEUED_DROP_ZONE`, bukan bukti bahwa HDFS telah tersinkronisasi.
+
+Pengujian pemisahan data (tanpa akses jaringan, memakai berkas sementara):
+
+```bash
+python -m unittest discover -s arkadanta/tests -p test_research_data.py -v
+```
+
+Dari folder `arkadanta/frontend`, jalankan pengujian layanan API dengan `node --test tests/api.test.mjs` dan build dengan `npm run build`.
+
+---
+
+## Harga Real-time di Dashboard React
+
+Backend membuka satu Binance WebSocket publik untuk empat aset ketika dashboard React dibuka. Event candle 5 menit berjalan diterima sekitar setiap dua detik dan diteruskan ke browser melalui **Server-Sent Events**, endpoint `GET /api/market/stream`. Harga, OHLC, volume berjalan, umur data, dan status koneksi tampil pada panel live di atas dashboard. Ini bukan harga setiap transaksi dan bukan jaminan latensi tertentu.
+
+Candle berjalan hanya ditampilkan. Saat Binance menyatakan candle 5 menit selesai, backend menyimpannya secara atomik, mencatat audit, lalu memberitahu dashboard untuk mengambil ulang analisis dan prediksi. Candle disimpan dengan deduplikasi simbol + timestamp. Upload, REST sync, dan stream berbagi penguncian penulisan dalam satu proses. Grafik analisis historis tetap mengikuti timeframe yang dipilih; grafik tersebut tidak diganti dengan harga candle berjalan.
+
+Model yang sudah tersedia digunakan kembali saat inferensi; kode lama masih dapat melatih model ketika model belum tersedia. Siapkan histori nyata yang cukup dan latih model melalui Model Lab sebelum demonstrasi. Streaming tidak menggantikan pengambilan histori untuk pelatihan.
+
+Koneksi terputus ditampilkan secara jelas dan dicoba kembali dengan jeda bertahap. Harga tanpa pembaruan selama 15 detik ditandai sebagai data terakhir, bukan LIVE. Tidak ada data simulasi. Stream hanya aktif selama ada browser yang berlangganan; saat dashboard ditutup, koneksi dihentikan. Untuk mengisi candle yang terlewat saat dashboard/backend mati atau koneksi terputus, jalankan Manual Sync; mekanisme backfill histori panjang belum ditambahkan. NiFi/HDFS/Spark belum terhubung otomatis dengan stream ini.
+
+Jalankan **satu worker backend** untuk aplikasi lokal ini. Jangan menjalankan backend Windows dan WSL bersamaan pada dataset yang sama. Panel stream ada di React; dashboard Streamlit tetap menggunakan alur pengambilan data sebelumnya.
+
+Setelah perubahan kode, pada terminal **WSL**, dari direktori `arkadanta`:
+
+```bash
+source ~/venvs/arkadanta/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+Jalankan React dengan `npm run dev` di Windows, buka `http://localhost:5173`, lalu tunggu label **LIVE** pada panel harga. Vite meneruskan stream ke backend port 8000; `VITE_API_URL` dapat digunakan jika backend berada di alamat lain. Akses internet ke Binance WebSocket diperlukan. Endpoint streaming tidak ditampilkan sebagai data JSON biasa di Swagger; pengujian manual dapat menggunakan `curl -N http://localhost:8000/api/market/stream`.
+
+Pengujian stream tanpa jaringan:
+
+```bash
+python -m unittest discover -s arkadanta/tests -p test_market_stream.py -v
+```
+
+---
+
 ## Struktur Modul (`arkadanta/`)
 
 ```text
@@ -55,8 +110,13 @@ arkadanta/
         Tab2AnalyticsBI.tsx
         Tab3ModelLabShield.tsx
   data/
-    sample_generator.py         # Generator data sampel 5m & audit log otomatis untuk pengujian mandiri
-    drop_zone/                  # Lokasi penyimpanan data OHLCV bersih
+    storage.py                  # Pembacaan data penelitian & penyimpanan audit
+    sample_generator.py         # Generator sintetis untuk tes eksplisit
+    research/
+      drop_zone/                # Data OHLCV penelitian aktif
+      models/                   # Model penelitian aktif
+      audit_logs.json           # Audit penelitian aktif
+    drop_zone/                  # Data lama, tidak dibaca otomatis
 ```
 
 ---

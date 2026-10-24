@@ -12,7 +12,7 @@ from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.analytics.timeframe_aggregator import aggregate_timeframe
 from backend.config import DEFAULT_SYMBOLS, DROP_ZONE_DIR
 from backend.schemas import DynamicConfig
-from data.sample_generator import load_clean_ohlcv
+from data.storage import load_clean_ohlcv
 
 router = APIRouter(tags=["Analytics & BI (Orang 2)"])
 

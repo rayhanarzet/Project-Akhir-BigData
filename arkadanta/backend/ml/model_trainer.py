@@ -15,7 +15,7 @@ from backend.ml.dynamic_feature_selector import select_and_prepare_features
 from backend.ml.model_evaluator import evaluate_classification, evaluate_regression
 from backend.ml.risk_labeler import DynamicRiskLabeler
 from backend.schemas import DynamicConfig
-from data.sample_generator import load_clean_ohlcv
+from data.storage import load_clean_ohlcv
 
 
 def train_dynamic_models(config: DynamicConfig) -> Dict[str, Any]:

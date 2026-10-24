@@ -4,7 +4,8 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
+# Isolasi dari dataset, audit, dan model lama yang mungkin berasal dari simulasi.
+DATA_DIR = BASE_DIR / "data" / "research"
 DROP_ZONE_DIR = DATA_DIR / "drop_zone"
 PROCESSED_DIR = DATA_DIR / "processed"
 MODELS_DIR = DATA_DIR / "models"

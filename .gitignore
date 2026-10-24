@@ -12,3 +12,6 @@ data/drop_zone/*.csv
 data/models/*.joblib
 data/models/*.json
 data/audit_logs.json
+
+/backups/
+/arkadanta/data/research/

@@ -40,7 +40,6 @@ if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) {
     Pop-Location
 }
 
-& $PythonExe -c "import sys; sys.path.insert(0, r'$ArkadantaDir'); from data.sample_generator import ensure_sample_data_exists; ensure_sample_data_exists()"
 
 Write-Host "[1/3] Menjalankan FastAPI Backend (http://localhost:8000)..." -ForegroundColor Green
 Start-Process cmd.exe -WorkingDirectory $ArkadantaDir -ArgumentList "/k `"$PythonExe`" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"

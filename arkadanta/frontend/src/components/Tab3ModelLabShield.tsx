@@ -38,6 +38,7 @@ import {
 } from '../services/api';
 
 interface Props {
+  dataRevision: number;
   config: DynamicConfigPayload;
   onChangeConfig: (partial: Partial<DynamicConfigPayload>) => void;
 }
@@ -48,22 +49,30 @@ const REGIME_COLORS: Record<RiskRegime, string> = {
   DANGER: '#fd5d93',
 };
 
-export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) => {
+export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, dataRevision }) => {
   const [metrics, setMetrics] = useState<ModelMetricsResponse | null>(null);
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [recentPrices, setRecentPrices] = useState<{ time: string; close: number }[]>([]);
   const [training, setTraining] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadAll = async () => {
-    const [mRes, pRes, aRes] = await Promise.all([
+  const loadAll = async (isActive: () => boolean) => {
+    setError(null);
+    setMetrics(null);
+    setPrediction(null);
+    setRecentPrices([]);
+    const [mRes, pRes, aRes] = await Promise.allSettled([
       fetchLatestModelMetrics(config),
       predictNextPeriodApi(config.symbol, config.timeframe),
       runDynamicAnalyticsApi(config),
     ]);
-    setMetrics(mRes);
-    setPrediction(pRes);
-    setRecentPrices(
-      aRes.series.slice(-45).map((pt) => ({
+    if (!isActive()) return;
+    if (mRes.status === 'fulfilled') setMetrics(mRes.value);
+    if (pRes.status === 'fulfilled') setPrediction(pRes.value);
+    const failures = [mRes, pRes, aRes].filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failures.length) setError(failures.map((r) => String(r.reason?.message || r.reason)).join(' '));
+    if (aRes.status === 'fulfilled') setRecentPrices(
+      aRes.value.series.slice(-45).map((pt) => ({
         time: pt.timestamp.slice(11, 16) || pt.timestamp.slice(5, 10),
         close: pt.close,
       }))
@@ -71,16 +80,23 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
   };
 
   useEffect(() => {
-    loadAll();
-  }, [config.symbol, config.timeframe]);
+    let active = true;
+    loadAll(() => active);
+    return () => { active = false; };
+  }, [config.symbol, config.timeframe, dataRevision]);
 
   const handleTrainModel = async () => {
     setTraining(true);
+    setError(null);
+    setMetrics(null);
+    setPrediction(null);
     try {
       const mRes = await trainAndEvaluateModels(config);
       setMetrics(mRes);
       const pRes = await predictNextPeriodApi(config.symbol, config.timeframe);
       setPrediction(pRes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Pelatihan model gagal.');
     } finally {
       setTraining(false);
     }
@@ -107,6 +123,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
 
   return (
     <div>
+      {error && <div role="alert" className="mb-4 p-4 border border-red-400 rounded text-red-300">{error}</div>}
       {/* ROW 1: LIVE MARKET SHIELD & RESISTANCE/STOP-LOSS CORRIDOR */}
       {prediction && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

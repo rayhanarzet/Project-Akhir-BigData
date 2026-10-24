@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.ml.model_predictor import predict_next_period
 from backend.schemas import PredictRequest
-from data.sample_generator import load_clean_ohlcv
+from data.storage import load_clean_ohlcv
 
 router = APIRouter(tags=["Prediction & Live Monitor (Orang 2)"])
 

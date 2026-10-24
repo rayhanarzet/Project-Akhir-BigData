@@ -23,7 +23,6 @@ from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
 from backend.ml.model_predictor import get_latest_metrics, predict_next_period
 from backend.ml.model_trainer import train_dynamic_models
 from backend.schemas import DynamicConfig, LiveSyncRequest, PredictRequest
-from data.sample_generator import ensure_sample_data_exists
 
 st.set_page_config(
     page_title="Arkadanta | Crypto Risk Intelligence",
@@ -31,7 +30,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-ensure_sample_data_exists(DEFAULT_SYMBOLS)
 
 # ------------------------------------------------------------------------------
 # Tema visual
@@ -209,14 +207,37 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 # Muat data bersama
 # ------------------------------------------------------------------------------
-baseline = get_historical_baseline()
-audit = pd.DataFrame(baseline.get("audit_logs", []))
-df_assets = pd.DataFrame(baseline["assets"])
-df, res = load_series(sym, tf, method, q, z, int(ma), int(rsi), int(roll))
-assets = {s: load_series(s, tf)[0] for s in DEFAULT_SYMBOLS}
-asset_res = {s: load_series(s, tf)[1] for s in DEFAULT_SYMBOLS}
-corr_all = load_corr(tf, DEFAULT_SYMBOLS[0], DEFAULT_SYMBOLS[1 % len(DEFAULT_SYMBOLS)], 30)
-metrics = get_latest_metrics()
+st.caption("Mode penelitian: data dan model lama tidak dipakai otomatis. Tidak ada pengganti data sintetis.")
+with st.expander("Ambil atau unggah data penelitian", expanded=True):
+    if st.button("Sinkronisasi data nyata Binance (semua aset)"):
+        try:
+            sync_live_binance(LiveSyncRequest(symbols=DEFAULT_SYMBOLS, limit=1000))
+            st.cache_data.clear()
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Sinkronisasi gagal: {getattr(exc, 'detail', str(exc))}")
+    research_file = st.file_uploader("Unggah CSV/JSON dari sumber nyata", type=["csv", "json"])
+    if research_file is not None and st.button("Proses data penelitian"):
+        try:
+            run_dynamic_ingestion_pipeline(research_file.name, research_file.getvalue(), default_symbol=sym)
+            st.cache_data.clear()
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Unggah gagal: {getattr(exc, 'detail', str(exc))}")
+
+try:
+    baseline = get_historical_baseline()
+    audit = pd.DataFrame(baseline.get("audit_logs", []))
+    df_assets = pd.DataFrame(baseline["assets"])
+    df, res = load_series(sym, tf, method, q, z, int(ma), int(rsi), int(roll))
+    assets = {s: load_series(s, tf)[0] for s in DEFAULT_SYMBOLS}
+    asset_res = {s: load_series(s, tf)[1] for s in DEFAULT_SYMBOLS}
+    corr_all = load_corr(tf, DEFAULT_SYMBOLS[0], DEFAULT_SYMBOLS[1 % len(DEFAULT_SYMBOLS)], 30)
+    metrics = get_latest_metrics()
+except Exception as exc:
+    st.error(f"Analisis belum tersedia: {getattr(exc, 'detail', str(exc))}")
+    st.info("Ambil atau unggah data nyata untuk aset yang dibutuhkan melalui panel di atas.")
+    st.stop()
 
 st.markdown(
     f"""

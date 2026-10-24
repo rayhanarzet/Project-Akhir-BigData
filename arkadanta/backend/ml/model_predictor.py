@@ -11,7 +11,7 @@ from backend.analytics.timeframe_aggregator import aggregate_timeframe
 from backend.config import MODELS_DIR
 from backend.ml.model_trainer import train_dynamic_models
 from backend.schemas import DynamicConfig, PredictRequest
-from data.sample_generator import load_clean_ohlcv
+from data.storage import load_clean_ohlcv
 
 
 def load_or_train_bundle(symbol: str = "BTCUSDT", timeframe: str = "1h") -> Dict[str, Any]:

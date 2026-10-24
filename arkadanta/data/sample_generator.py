@@ -1,19 +1,9 @@
-"""Generator data sampel realistis & helper penyimpanan data untuk pengujian mandiri Orang 2."""
+"""Generator sintetis untuk pengujian eksplisit. Tidak menulis ke penyimpanan penelitian."""
 
 from datetime import datetime, timedelta, timezone
-import json
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 import numpy as np
 import pandas as pd
-
-from backend.config import (
-    AUDIT_LOG_PATH,
-    DEFAULT_SYMBOLS,
-    DROP_ZONE_DIR,
-    HDFS_BASE_PATH,
-)
-
 
 ASSET_BASE_PRICES: Dict[str, float] = {
     "BTCUSDT": 68500.0,
@@ -101,83 +91,3 @@ def generate_synthetic_5m_ohlcv(
         }
     )
     return df
-
-
-def ensure_sample_data_exists(symbols: Optional[List[str]] = None) -> None:
-    """Memastikan data 5m bersih (minimal 2000 baris) dan log audit awal tersedia di drop_zone."""
-    target_symbols = symbols or DEFAULT_SYMBOLS
-    audit_entries = load_audit_logs()
-    created_any = False
-
-    for sym in target_symbols:
-        file_path = DROP_ZONE_DIR / f"{sym}_5m_clean.csv"
-        needs_init = not file_path.exists()
-        if not needs_init:
-            try:
-                existing_df = pd.read_csv(file_path)
-                if len(existing_df) < 300:
-                    needs_init = True
-            except Exception:
-                needs_init = True
-
-        if needs_init:
-            df = generate_synthetic_5m_ohlcv(symbol=sym, n_candles=2000)
-            df.to_csv(file_path, index=False)
-            created_any = True
-            audit_entries.append(
-                {
-                    "run_id": f"init_{sym.lower()}_001",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "source_name": f"{sym.lower()}_historical_5m.csv",
-                    "format_detected": "CSV",
-                    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
-                    "column_mapping": {
-                        "open_time": "timestamp",
-                        "symbol": "coin_symbol",
-                        "vol": "volume",
-                    },
-                    "symbols_detected": [sym],
-                    "rows_before": 2018,
-                    "rows_after": len(df),
-                    "duplicates_removed": 11,
-                    "imputed_ohlc_rows": 4,
-                    "imputed_volume_rows": 2,
-                    "rejected_rows": 7,
-                    "error_reasons": {
-                        "high_less_than_low": 5,
-                        "non_positive_price": 2,
-                        "negative_volume": 0,
-                        "invalid_timestamp": 0,
-                    },
-                    "drop_zone_path": str(file_path.relative_to(DROP_ZONE_DIR.parent.parent)),
-                    "hdfs_target_path": f"{HDFS_BASE_PATH}symbol={sym}/",
-                    "nifi_hdfs_status": "SYNCED",
-                    "quality_score_pct": 99.1,
-                }
-            )
-
-    if created_any or not AUDIT_LOG_PATH.exists():
-        save_audit_logs(audit_entries)
-
-
-def load_clean_ohlcv(symbol: str = "BTCUSDT") -> pd.DataFrame:
-    """Membaca data 5m bersih untuk satu simbol dari drop_zone (atau membuatnya jika belum ada)."""
-    ensure_sample_data_exists([symbol])
-    file_path = DROP_ZONE_DIR / f"{symbol.upper()}_5m_clean.csv"
-    df = pd.read_csv(file_path)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-    df = df.sort_values("timestamp").drop_duplicates(subset=["coin_symbol", "timestamp"]).reset_index(drop=True)
-    return df
-
-
-def load_audit_logs() -> List[dict]:
-    if AUDIT_LOG_PATH.exists():
-        try:
-            return json.loads(AUDIT_LOG_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-    return []
-
-
-def save_audit_logs(logs: List[dict]) -> None:
-    AUDIT_LOG_PATH.write_text(json.dumps(logs, indent=2), encoding="utf-8")

@@ -14,7 +14,7 @@ from backend.ingestion.processors.csv_processor import parse_csv_bytes
 from backend.ingestion.processors.json_processor import parse_json_bytes
 from backend.ingestion.schema_validator import map_and_validate_schema
 from backend.schemas import IngestionAuditReport
-from data.sample_generator import load_audit_logs, save_audit_logs
+from data.storage import append_audit_logs, save_clean_ohlcv
 
 
 def _try_sync_to_hdfs(local_path: str, hdfs_dir: str) -> str:
@@ -122,14 +122,14 @@ def run_dynamic_ingestion_pipeline(
     for sym, sym_df in df_clean.groupby("coin_symbol"):
         sym_path = DROP_ZONE_DIR / f"{sym}_5m_clean.csv"
         sym_clean = sym_df.sort_values("timestamp").reset_index(drop=True)
-        sym_clean.to_csv(sym_path, index=False)
-        saved_paths.append(f"data/drop_zone/{sym_path.name}")
+        save_clean_ohlcv(sym, sym_clean, merge=False)
+        saved_paths.append(f"data/research/drop_zone/{sym_path.name}")
         hdfs_status = _try_sync_to_hdfs(str(sym_path), f"{HDFS_BASE_PATH}symbol={sym}/")
 
     if not saved_paths:
         out_path = DROP_ZONE_DIR / f"{primary_sym}_5m_clean.csv"
-        df_clean.to_csv(out_path, index=False)
-        saved_paths.append(f"data/drop_zone/{out_path.name}")
+        save_clean_ohlcv(primary_sym, df_clean, merge=False)
+        saved_paths.append(f"data/research/drop_zone/{out_path.name}")
 
     rows_after = len(df_clean)
     quality_score = round((rows_after / max(rows_before, 1)) * 100.0, 2)
@@ -159,8 +159,6 @@ def run_dynamic_ingestion_pipeline(
         quality_score_pct=quality_score,
     )
 
-    logs = load_audit_logs()
-    logs.insert(0, report.model_dump())
-    save_audit_logs(logs[:50])
+    append_audit_logs([report.model_dump()])
 
     return df_clean, report
