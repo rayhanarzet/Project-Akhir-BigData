@@ -1,7 +1,10 @@
 {
-  "trained_at": "2026-10-23T06:06:01.717625+00:00",
-  "execution_engine": "Scikit-Learn + Pandas (Speed Layer)",
-  "spark_batch_metrics": null,
+  "trained_at": "2026-10-24T07:57:16.323596+00:00",
+  "execution_engine": "Scikit-Learn + Pandas (PySpark Local Fallback)",
+  "spark_batch_metrics": {
+    "status": "fallback",
+    "reason": "No module named 'pyspark'"
+  },
   "symbol": "BTCUSDT",
   "timeframe": "1h",
   "target_horizon": 1,
@@ -13,15 +16,15 @@
     "bb_width",
     "hl_range",
     "avg_volatility",
-    "lower_wick_ratio",
-    "upper_wick_ratio",
-    "body_ratio",
-    "co_change",
-    "ema_20",
-    "sma_20",
-    "log_return",
     "rolling_volatility",
-    "buy_sell_pressure_ratio"
+    "log_return",
+    "co_change",
+    "sma_20",
+    "ema_20",
+    "buy_sell_pressure_ratio",
+    "body_ratio",
+    "lower_wick_ratio",
+    "upper_wick_ratio"
   ],
   "cluster_k": 3,
   "train_ratio": 0.8,
@@ -64,24 +67,24 @@
         "z_hl_range": -0.8891,
         "centroid_avg_volatility": 0.007201,
         "z_avg_volatility": -0.3203,
+        "centroid_rolling_volatility": 0.021275,
+        "z_rolling_volatility": -0.7546,
+        "centroid_log_return": -0.001519,
+        "z_log_return": -0.1485,
+        "centroid_co_change": -0.001716,
+        "z_co_change": -0.0632,
+        "centroid_sma_20": 68766.069377,
+        "z_sma_20": -0.6411,
+        "centroid_ema_20": 68522.182559,
+        "z_ema_20": -0.7187,
+        "centroid_buy_sell_pressure_ratio": 0.489872,
+        "z_buy_sell_pressure_ratio": -0.0369,
+        "centroid_body_ratio": 0.282164,
+        "z_body_ratio": -0.3214,
         "centroid_lower_wick_ratio": 0.306868,
         "z_lower_wick_ratio": -0.0921,
         "centroid_upper_wick_ratio": 0.410967,
-        "z_upper_wick_ratio": 0.4671,
-        "centroid_body_ratio": 0.282164,
-        "z_body_ratio": -0.3214,
-        "centroid_co_change": -0.001716,
-        "z_co_change": -0.0632,
-        "centroid_ema_20": 68522.182559,
-        "z_ema_20": -0.7187,
-        "centroid_sma_20": 68766.069377,
-        "z_sma_20": -0.6411,
-        "centroid_log_return": -0.001519,
-        "z_log_return": -0.1485,
-        "centroid_rolling_volatility": 0.021275,
-        "z_rolling_volatility": -0.7546,
-        "centroid_buy_sell_pressure_ratio": 0.489872,
-        "z_buy_sell_pressure_ratio": -0.0369
+        "z_upper_wick_ratio": 0.4671
       },
       {
         "cluster_id": 0,
@@ -103,24 +106,24 @@
         "z_hl_range": 0.4515,
         "centroid_avg_volatility": 0.016466,
         "z_avg_volatility": 1.347,
+        "centroid_rolling_volatility": 0.023927,
+        "z_rolling_volatility": -0.533,
+        "centroid_log_return": 0.024576,
+        "z_log_return": 0.5136,
+        "centroid_co_change": 0.026118,
+        "z_co_change": 0.709,
+        "centroid_sma_20": 68804.86379,
+        "z_sma_20": -0.6288,
+        "centroid_ema_20": 68980.709284,
+        "z_ema_20": -0.5818,
+        "centroid_buy_sell_pressure_ratio": 0.523055,
+        "z_buy_sell_pressure_ratio": 0.6493,
+        "centroid_body_ratio": 0.584753,
+        "z_body_ratio": 0.7082,
         "centroid_lower_wick_ratio": 0.233746,
         "z_lower_wick_ratio": -0.3572,
         "centroid_upper_wick_ratio": 0.181501,
-        "z_upper_wick_ratio": -0.4271,
-        "centroid_body_ratio": 0.584753,
-        "z_body_ratio": 0.7082,
-        "centroid_co_change": 0.026118,
-        "z_co_change": 0.709,
-        "centroid_ema_20": 68980.709284,
-        "z_ema_20": -0.5818,
-        "centroid_sma_20": 68804.86379,
-        "z_sma_20": -0.6288,
-        "centroid_log_return": 0.024576,
-        "z_log_return": 0.5136,
-        "centroid_rolling_volatility": 0.023927,
-        "z_rolling_volatility": -0.533,
-        "centroid_buy_sell_pressure_ratio": 0.523055,
-        "z_buy_sell_pressure_ratio": 0.6493
+        "z_upper_wick_ratio": -0.4271
       },
       {
         "cluster_id": 1,
@@ -142,24 +145,24 @@
         "z_hl_range": 0.8529,
         "centroid_avg_volatility": 0.006457,
         "z_avg_volatility": -0.4542,
+        "centroid_rolling_volatility": 0.046026,
+        "z_rolling_volatility": 1.3128,
+        "centroid_log_return": -0.00115,
+        "z_log_return": -0.1392,
+        "centroid_co_change": -0.012933,
+        "z_co_change": -0.3745,
+        "centroid_sma_20": 74631.429935,
+        "z_sma_20": 1.2285,
+        "centroid_ema_20": 75278.210969,
+        "z_ema_20": 1.298,
+        "centroid_buy_sell_pressure_ratio": 0.473767,
+        "z_buy_sell_pressure_ratio": -0.37,
+        "centroid_body_ratio": 0.364244,
+        "z_body_ratio": -0.0421,
         "centroid_lower_wick_ratio": 0.428305,
         "z_lower_wick_ratio": 0.3481,
         "centroid_upper_wick_ratio": 0.207451,
-        "z_upper_wick_ratio": -0.326,
-        "centroid_body_ratio": 0.364244,
-        "z_body_ratio": -0.0421,
-        "centroid_co_change": -0.012933,
-        "z_co_change": -0.3745,
-        "centroid_ema_20": 75278.210969,
-        "z_ema_20": 1.298,
-        "centroid_sma_20": 74631.429935,
-        "z_sma_20": 1.2285,
-        "centroid_log_return": -0.00115,
-        "z_log_return": -0.1392,
-        "centroid_rolling_volatility": 0.046026,
-        "z_rolling_volatility": 1.3128,
-        "centroid_buy_sell_pressure_ratio": 0.473767,
-        "z_buy_sell_pressure_ratio": -0.37
+        "z_upper_wick_ratio": -0.326
       }
     ],
     "regime_distribution": {
@@ -217,73 +220,73 @@
     ]
   },
   "regression_metrics": {
-    "mae": 0.080038,
-    "rmse": 0.089709
+    "mae": 0.079744,
+    "rmse": 0.087553
   },
   "feature_importances": [
     {
       "feature": "rolling_volatility",
-      "importance": 0.191
+      "importance": 0.2076
     },
     {
       "feature": "bb_width",
-      "importance": 0.1319
+      "importance": 0.1342
     },
     {
       "feature": "ema_20",
-      "importance": 0.1205
-    },
-    {
-      "feature": "sma_20",
-      "importance": 0.0963
+      "importance": 0.1047
     },
     {
       "feature": "upper_wick_ratio",
-      "importance": 0.0949
+      "importance": 0.1005
+    },
+    {
+      "feature": "sma_20",
+      "importance": 0.0936
     },
     {
       "feature": "rsi_14",
-      "importance": 0.0673
-    },
-    {
-      "feature": "hl_range",
-      "importance": 0.0523
-    },
-    {
-      "feature": "max_volatility",
-      "importance": 0.0418
+      "importance": 0.066
     },
     {
       "feature": "avg_volatility",
-      "importance": 0.0368
+      "importance": 0.0399
     },
     {
-      "feature": "spike_ratio",
-      "importance": 0.029
+      "feature": "max_volatility",
+      "importance": 0.0363
     },
     {
-      "feature": "lower_wick_ratio",
-      "importance": 0.0283
-    },
-    {
-      "feature": "volume_zscore",
-      "importance": 0.0276
-    },
-    {
-      "feature": "body_ratio",
-      "importance": 0.0255
-    },
-    {
-      "feature": "buy_sell_pressure_ratio",
-      "importance": 0.021
+      "feature": "hl_range",
+      "importance": 0.0324
     },
     {
       "feature": "log_return",
-      "importance": 0.0186
+      "importance": 0.0307
+    },
+    {
+      "feature": "spike_ratio",
+      "importance": 0.0305
+    },
+    {
+      "feature": "lower_wick_ratio",
+      "importance": 0.0298
+    },
+    {
+      "feature": "volume_zscore",
+      "importance": 0.0269
     },
     {
       "feature": "co_change",
-      "importance": 0.0173
+      "importance": 0.0261
+    },
+    {
+      "feature": "body_ratio",
+      "importance": 0.0224
+    },
+    {
+      "feature": "buy_sell_pressure_ratio",
+      "importance": 0.0184
     }
   ],
   "test_predictions_preview": [
@@ -293,7 +296,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.124208,
-      "predicted_vol_t1": 0.106925
+      "predicted_vol_t1": 0.109332
     },
     {
       "timestamp": "2026-10-22 20:00:00+00:00",
@@ -301,7 +304,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.194906,
-      "predicted_vol_t1": 0.099895
+      "predicted_vol_t1": 0.10224
     },
     {
       "timestamp": "2026-10-22 21:00:00+00:00",
@@ -309,7 +312,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.25488,
-      "predicted_vol_t1": 0.107494
+      "predicted_vol_t1": 0.109538
     },
     {
       "timestamp": "2026-10-22 22:00:00+00:00",
@@ -317,7 +320,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.230475,
-      "predicted_vol_t1": 0.10202
+      "predicted_vol_t1": 0.104709
     },
     {
       "timestamp": "2026-10-22 23:00:00+00:00",
@@ -325,31 +328,31 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.138224,
-      "predicted_vol_t1": 0.105724
+      "predicted_vol_t1": 0.107518
     },
     {
       "timestamp": "2026-10-23 00:00:00+00:00",
       "close": 72810.6091,
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.126663,
-      "predicted_vol_t1": 0.096152
+      "actual_vol_t1": 0.006797,
+      "predicted_vol_t1": 0.095441
     },
     {
       "timestamp": "2026-10-23 01:00:00+00:00",
       "close": 81356.7,
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.217119,
-      "predicted_vol_t1": 0.09302
+      "actual_vol_t1": 0.17606,
+      "predicted_vol_t1": 0.077274
     },
     {
       "timestamp": "2026-10-23 02:00:00+00:00",
       "close": 70201.4342,
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.183481,
-      "predicted_vol_t1": 0.107359
+      "actual_vol_t1": 0.158039,
+      "predicted_vol_t1": 0.097148
     },
     {
       "timestamp": "2026-10-23 03:00:00+00:00",
@@ -357,15 +360,15 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.159084,
-      "predicted_vol_t1": 0.092821
+      "predicted_vol_t1": 0.094
     },
     {
       "timestamp": "2026-10-23 04:00:00+00:00",
       "close": 81587.32,
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.159548,
-      "predicted_vol_t1": 0.086906
+      "actual_vol_t1": 0.154631,
+      "predicted_vol_t1": 0.085899
     },
     {
       "timestamp": "2026-10-23 05:00:00+00:00",
@@ -373,7 +376,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.001191,
-      "predicted_vol_t1": 0.091338
+      "predicted_vol_t1": 0.086886
     }
   ]
 }

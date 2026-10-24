@@ -1,5 +1,125 @@
 [
   {
+    "run_id": "cron_519ef739",
+    "timestamp": "2026-10-24T08:00:35.649802+00:00",
+    "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 665,
+    "rows_after": 665,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_7e3a5065",
+    "timestamp": "2026-10-24T08:00:36.593240+00:00",
+    "source_name": "Binance /api/v3/klines (ETHUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 665,
+    "rows_after": 665,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_e14dd238",
+    "timestamp": "2026-10-24T08:00:37.668892+00:00",
+    "source_name": "Binance /api/v3/klines (BNBUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2068,
+    "rows_after": 2068,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_15e9f5c3",
+    "timestamp": "2026-10-24T08:00:38.650395+00:00",
+    "source_name": "Binance /api/v3/klines (ADAUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2068,
+    "rows_after": 2068,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
     "run_id": "cron_8ea50b4b",
     "timestamp": "2026-10-23T06:07:20.464302+00:00",
     "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
