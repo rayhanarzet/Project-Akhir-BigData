@@ -59,6 +59,26 @@ python -m unittest discover -s arkadanta/tests -p test_market_stream.py -v
 
 ---
 
+## Machine Learning: GMM + HistGradientBoosting
+
+- **GaussianMixture (GMM)** menggantikan pengelompokan risiko. Mean setiap komponen dinilai dengan skor risiko, lalu diurutkan menjadi SAFE/WARNING/DANGER. Inisialisasi memakai `random_from_data`, bukan K-Means.
+- **HistGradientBoostingClassifier** memprediksi kelas risiko T+horizon dan probabilitasnya; **HistGradientBoostingRegressor** memprediksi volatilitas T+horizon. Early stopping acak dinonaktifkan untuk menjaga urutan waktu.
+- Train/test dibagi kronologis dengan embargo sepanjang horizon. Target latih terakhir serta fitting scaler/GMM selalu mendahului fitur uji pertama.
+- Evaluasi GMM memuat BIC, AIC, konvergensi, dan silhouette (dapat `null` jika komponen terisi tidak cukup). Klasifikasi/regresi tetap memakai Accuracy, Precision, Recall, F1, MAE, dan RMSE.
+- Grafik kepentingan fitur memakai **permutation importance terhadap macro F1 pada holdout**, maksimal 500 baris dan tiga pengulangan. Nilai negatif mungkin terjadi; grafik bukan bukti hubungan sebab-akibat dan tidak dipakai untuk memilih fitur/model.
+
+Parameter API/UI sekarang: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`, dan `target_horizon`. Nama lama `cluster_k`, `rf_num_trees`, `rf_max_depth`, serta metode anomali `kmeans` ditolak agar tidak diabaikan diam-diam. Metode anomali pengganti adalah `gmm` dengan skor negative log-likelihood. Metrik kelompok dikirim sebagai `gmm_metrics`; prediksi memakai `current_component_id`.
+
+Artefak baru disimpan di `data/research/models/gmm_hgb_v1/`, terpisah dari model lama. Setelah restart backend, latih ulang melalui **Model Lab → Train & Evaluate Models**. Pilih timeframe dengan data nyata yang cukup; minimal 30 + horizon candle dan setidaknya dua kelas pada data latih. Model/matriks fitur disimpan bersama konfigurasi indikator agar inferensi menggunakan parameter yang sama. Aplikasi dapat melatih default secara otomatis jika artefak baru belum tersedia.
+
+**Jalur Spark:** agregasi/feature engineering memakai PySpark, kemudian fitur dikumpulkan ke driver untuk trainer GMM/HGB yang sama, dengan batas 500.000 baris. HistGradientBoosting tidak tersedia di Spark MLlib; pelatihan ini **bukan training terdistribusi**. Inferensi model yang dilatih dengan Spark juga memakai persiapan fitur Spark yang sama. Memilih Spark membutuhkan Java/PySpark yang berfungsi; kegagalan training Spark ditampilkan, tanpa penggantian engine diam-diam.
+
+Pengujian migrasi (semua data sintetis dibuat eksplisit di direktori sementara):
+
+```bash
+python -m unittest discover -s arkadanta/tests -p test_ml_models.py -v
+```
+
 ## Struktur Modul (`arkadanta/`)
 
 ```text
@@ -85,12 +105,12 @@ arkadanta/
     analytics/                  # [ORANG 2]
       timeframe_aggregator.py   # Agregasi deterministik 5m -> 15m, 1h, 4h, 1d, 1w
       feature_engineering.py    # Fitur volatilitas, teknikal (SMA/EMA/RSI/BB), struktur candle, mikrostruktur
-      anomaly_detector.py       # Deteksi anomali: rolling_zscore, iqr, adaptive_quantile, kmeans
+      anomaly_detector.py       # Deteksi anomali: rolling_zscore, iqr, adaptive_quantile, gmm
       correlation_analyzer.py   # Pearson, rolling correlation, lag correlation, market-wide risk score
     ml/                         # [ORANG 2]
       dynamic_feature_selector.py
-      risk_labeler.py           # StandardScaler + K-Means + pengurutan skor risiko centroid (SAFE/WARNING/DANGER)
-      model_trainer.py          # Temporal split + Random Forest Classifier & Regressor (T+1)
+      risk_labeler.py           # StandardScaler + Gaussian Mixture + pengurutan skor risiko centroid (SAFE/WARNING/DANGER)
+      model_trainer.py          # Temporal split + HistGradientBoosting Classifier & Regressor (T+1)
       model_evaluator.py        # Silhouette, Accuracy, Precision, Recall, F1, Confusion Matrix, MAE, RMSE
       model_predictor.py        # Inferensi T+1 + estimasi Resistance & Stop Loss
   spark_jobs/                   # PySpark Batch Layer

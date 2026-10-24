@@ -390,7 +390,7 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig, dataR
                 <option value="adaptive_quantile">Adaptive Quantile</option>
                 <option value="rolling_zscore">Rolling Z-Score</option>
                 <option value="iqr">Interquartile Range (IQR)</option>
-                <option value="kmeans">K-Means Distance</option>
+                <option value="gmm">GMM Negative Log-Likelihood</option>
               </select>
             </div>
 

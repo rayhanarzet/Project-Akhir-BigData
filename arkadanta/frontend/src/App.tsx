@@ -61,12 +61,13 @@ export const App: React.FC = () => {
     anomaly_quantile: 0.95,
     anomaly_z_threshold: 2.5,
     anomaly_iqr_multiplier: 1.5,
-    cluster_k: 3,
+    gmm_components: 3,
     correlation_window: 30,
     max_lag: 6,
     train_ratio: 0.8,
-    rf_num_trees: 200,
-    rf_max_depth: 10,
+    gb_max_iter: 200,
+    gb_max_depth: 10,
+    gb_learning_rate: 0.1,
     target_horizon: 1,
     use_spark: false,
   });
@@ -116,7 +117,7 @@ export const App: React.FC = () => {
     {
       id: 'tab3',
       label: 'Model Lab & Shield',
-      subtitle: 'K-Means & RF T+1 Risk',
+      subtitle: 'Gaussian Mixture & HGB T+1 Risk',
       icon: <Cpu className="w-4 h-4" />,
     },
     {

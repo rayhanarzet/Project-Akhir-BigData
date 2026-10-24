@@ -2,6 +2,8 @@
 
 Dokumen ini mendefinisikan titik temu (data, skema, dan API) antara **Orang 1 (Data Pipeline & Big Data)** dan **Orang 2 (Analytics, Machine Learning & Dashboard)**.
 
+**Revisi ML:** label risiko memakai GaussianMixture; prediksi memakai HistGradientBoostingClassifier/Regressor. Konfigurasi: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`. Respons metrik: `gmm_metrics` (silhouette nullable, BIC, AIC, mean komponen); respons prediksi: `current_component_id`. Model lama tidak dibaca, artefak baru berada di `data/research/models/gmm_hgb_v1/`. Spark memproses fitur; training GMM/HGB berlangsung di driver lokal dengan batas 500.000 baris.
+
 ---
 
 ## 1. Kontrak Skema Data OHLCV Standar (Output Orang 1 -> Input Orang 2)
@@ -78,7 +80,7 @@ Endpoint `POST /api/ingestion/upload` dan `POST /api/ingestion/live-sync` mengem
 | `/api/historical-baseline` | `GET` | Orang 1 & 2 | Ringkasan ketersediaan data bersih & status audit terbaru |
 | `/api/analytics/run` | `POST` | **Orang 2** | Agregasi timeframe, feature engineering dinamis, deteksi anomali |
 | `/api/analytics/correlation` | `GET` | **Orang 2** | Korelasi Pearson, rolling correlation, lag correlation, market risk |
-| `/api/ml/train` | `POST` | **Orang 2** | K-Means centroid risk labeling (`SAFE`/`WARNING`/`DANGER`) + RF $T+1$ |
+| `/api/ml/train` | `POST` | **Orang 2** | GMM component risk labeling (`SAFE`/`WARNING`/`DANGER`) + HistGradientBoosting $T+1$ |
 | `/api/ml/predict` | `POST` | **Orang 2** | Inferensi risiko $T+1$, volatilitas $T+1$, Resistance & Stop Loss |
 | `/api/models/metrics` | `GET` | **Orang 2** | Silhouette score, centroid table, Accuracy/Precision/Recall/F1, MAE/RMSE |
 | `/api/live-monitor` | `GET` | **Orang 2** | Live Market Shield 5m + prediksi aktif $T+1$ |

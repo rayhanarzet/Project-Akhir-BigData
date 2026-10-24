@@ -1,5 +1,4 @@
-"""[ORANG 2] Orkestrator Batch Layer PySpark (HDFS / Local Drop Zone -> Aggregation -> Features -> ML)."""
-
+"""Agregasi dan feature engineering Spark; training GMM/HGB di driver lokal."""
 import argparse
 import json
 from pathlib import Path
@@ -9,62 +8,44 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from pyspark.sql import SparkSession
-from backend.config import DEFAULT_FEATURES, DROP_ZONE_DIR
+from backend.config import DROP_ZONE_DIR
+from backend.schemas import DynamicConfig
 from data.storage import load_clean_ohlcv
-from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
-from spark_jobs.feature_pipeline import spark_compute_features
-from spark_jobs.train_models import spark_train_and_evaluate
+from spark_jobs.train_models import collect_model_features
+from backend.ml.model_trainer import train_from_features
 
 
-def run_batch_job(
-    symbol: str = "BTCUSDT",
-    timeframe: str = "1h",
-    feature_cols: list[str] | None = None,
-    cluster_k: int = 3,
-    train_ratio: float = 0.8,
-    rf_num_trees: int = 100,
-    rf_max_depth: int = 10,
-    ma_period: int = 20,
-    rsi_period: int = 14,
-    rolling_window: int = 20,
-) -> dict:
+def prepare_spark_features(config: DynamicConfig):
+    from pyspark.sql import SparkSession, functions as F
+    from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
+    from spark_jobs.feature_pipeline import spark_compute_features
+    symbol = config.symbol.upper()
     load_clean_ohlcv(symbol)
-    input_csv = str(DROP_ZONE_DIR / f"{symbol.upper()}_5m_clean.csv")
-
-    spark = (
-        SparkSession.builder.appName(f"Arkadanta-Batch-{symbol}-{timeframe}")
-        .master("local[*]")
-        .getOrCreate()
-    )
+    spark = (SparkSession.builder.appName(f"Arkadanta-GMM-HGB-{symbol}").master("local[*]")
+             .config("spark.sql.session.timeZone", "UTC").getOrCreate())
     spark.sparkContext.setLogLevel("ERROR")
-
     try:
-        df_raw = spark.read.csv(input_csv, header=True, inferSchema=True)
-        df_agg = spark_aggregate_timeframe(df_raw, timeframe=timeframe)
-        df_feat = spark_compute_features(
-            df_agg,
-            ma_period=ma_period,
-            rsi_period=rsi_period,
-            rolling_window=rolling_window,
-        )
-        metrics = spark_train_and_evaluate(
-            df_feat,
-            feature_cols=feature_cols or DEFAULT_FEATURES,
-            cluster_k=cluster_k,
-            train_ratio=train_ratio,
-            rf_num_trees=rf_num_trees,
-            rf_max_depth=rf_max_depth,
-        )
-        return metrics
+        raw = spark.read.csv(str(DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"), header=True, inferSchema=True)
+        raw = raw.withColumn("timestamp", F.to_timestamp("timestamp"))
+        if config.start_date:
+            raw = raw.filter(F.col("timestamp") >= F.to_timestamp(F.lit(config.start_date)))
+        if config.end_date:
+            raw = raw.filter(F.col("timestamp") <= F.to_timestamp(F.lit(config.end_date)))
+        aggregated = spark_aggregate_timeframe(raw, timeframe=config.timeframe)
+        features = spark_compute_features(aggregated, ma_period=config.ma_period,
+                                          rsi_period=config.rsi_period, rolling_window=config.rolling_window)
+        return collect_model_features(features)
     finally:
         spark.stop()
 
 
+def run_batch_job(config: DynamicConfig) -> dict:
+    return train_from_features(prepare_spark_features(config), config, "PySpark Features + Scikit-Learn GMM/HGB (driver)")
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Arkadanta PySpark Batch Job")
+    parser = argparse.ArgumentParser(description="Arkadanta Spark features + GMM/HGB driver training")
     parser.add_argument("--symbol", default="BTCUSDT")
     parser.add_argument("--timeframe", default="1h")
     args = parser.parse_args()
-    result = run_batch_job(symbol=args.symbol, timeframe=args.timeframe)
-    print(json.dumps(result, indent=2))
+    print(json.dumps(run_batch_job(DynamicConfig(symbol=args.symbol, timeframe=args.timeframe, use_spark=True)), indent=2))

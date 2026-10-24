@@ -192,7 +192,7 @@ with st.sidebar:
     sym = st.selectbox("Aset utama", DEFAULT_SYMBOLS)
     tf = st.selectbox("Timeframe agregasi", SUPPORTED_TIMEFRAMES, index=2)
     st.markdown("**Deteksi anomali**")
-    method = st.selectbox("Metode", ["adaptive_quantile", "rolling_zscore", "iqr", "kmeans"])
+    method = st.selectbox("Metode", ["adaptive_quantile", "rolling_zscore", "iqr", "gmm"])
     q = st.slider("Kuantil adaptif", 0.85, 0.99, 0.95, 0.01)
     z = st.slider("Z-score / IQR multiplier", 1.0, 5.0, 2.5, 0.1)
     with st.expander("Indikator teknikal"):
@@ -246,7 +246,7 @@ st.markdown(
   <p>Dynamic Big Data Intelligence Pipeline untuk Analisis, Deteksi Anomali, dan Prediksi Risiko Volatilitas Pasar Kripto</p>
   <span class="chip">⚡ Lambda Architecture</span><span class="chip">🗄️ NiFi → HDFS</span>
   <span class="chip">🔥 PySpark</span><span class="chip">📡 Binance 5m</span>
-  <span class="chip">🧠 K-Means + Random Forest T+1</span>
+  <span class="chip">🧠 Gaussian Mixture + HistGradientBoosting T+1</span>
   <span class="chip">📌 {sym} · {tf} · {method}</span>
 </div>
 """,
@@ -307,8 +307,8 @@ with tabs[0]:
                 "NiFi → HDFS (Batch)",
                 "PySpark Aggregation",
                 "Feature Engineering",
-                "K-Means Risk Labeler",
-                "Random Forest T+1",
+                "Gaussian Mixture Risk Labeler",
+                "HistGradientBoosting T+1",
                 "FastAPI Serving",
                 "Dashboard",
             ]
@@ -320,10 +320,10 @@ with tabs[0]:
                 ("Dynamic Pipeline Controller", "NiFi → HDFS (Batch)", ok),
                 ("NiFi → HDFS (Batch)", "PySpark Aggregation", ok),
                 ("PySpark Aggregation", "Feature Engineering", ok),
-                ("Feature Engineering", "K-Means Risk Labeler", ok // 2),
-                ("Feature Engineering", "Random Forest T+1", ok - ok // 2),
-                ("K-Means Risk Labeler", "FastAPI Serving", ok // 2),
-                ("Random Forest T+1", "FastAPI Serving", ok - ok // 2),
+                ("Feature Engineering", "Gaussian Mixture Risk Labeler", ok // 2),
+                ("Feature Engineering", "HistGradientBoosting T+1", ok - ok // 2),
+                ("Gaussian Mixture Risk Labeler", "FastAPI Serving", ok // 2),
+                ("HistGradientBoosting T+1", "FastAPI Serving", ok - ok // 2),
                 ("FastAPI Serving", "Dashboard", ok),
             ]
             node_colors = [PALETTE[k % len(PALETTE)] for k in range(len(nodes))]
@@ -339,12 +339,12 @@ with tabs[0]:
                     ),
                 )
             )
-            # ponytail: split K-Means/RF 50:50 hanya ilustrasi; ganti dengan jumlah sampel latih nyata bila dibutuhkan.
+            # Pembagian aliran diagram ini ilustrasi, bukan jumlah sampel pelatihan model.
             show(fig, 400, "Alur Data Lambda Architecture (jumlah baris dari audit log)")
         else:
             st.info("Belum ada audit log ingestion.")
     with c2:
-        dist = metrics.get("kmeans_metrics", {}).get("regime_distribution", {})
+        dist = metrics.get("gmm_metrics", {}).get("regime_distribution", {})
         if dist:
             fig = go.Figure(
                 go.Pie(
@@ -670,37 +670,39 @@ with tabs[3]:
 # TAB 4: MODEL LAB
 # ==============================================================================
 with tabs[4]:
-    section("Konfigurasi Pelatihan", "K-Means risk labeler + Random Forest T+1 dengan temporal split")
+    section("Konfigurasi Pelatihan", "Gaussian Mixture risk labeler + HistGradientBoosting T+1 dengan temporal split")
     m = st.columns(4)
     ml_symbol = m[0].selectbox("Aset target", DEFAULT_SYMBOLS, key="ml_sym")
     ml_tf = m[1].selectbox("Timeframe model", SUPPORTED_TIMEFRAMES, index=2, key="ml_tf")
-    ml_k = m[2].slider("Jumlah cluster (k)", 3, 5, 3)
+    ml_k = m[2].slider("Jumlah komponen GMM", 3, 5, 3)
     ml_ratio = m[3].slider("Rasio data latih", 0.60, 0.90, 0.80, 0.05)
     m = st.columns([2, 1, 1])
     ml_features = m[0].multiselect("Fitur dinamis", AVAILABLE_FEATURES, default=DEFAULT_FEATURES)
-    ml_trees = m[1].number_input("n_estimators", 50, 500, 200, 50)
+    ml_trees = m[1].number_input("max_iter HGB", 50, 500, 200, 50)
     ml_depth = m[2].number_input("max_depth", 3, 25, 10, 1)
+    ml_learning_rate = st.number_input("Learning rate HGB", 0.01, 1.0, 0.1, 0.01)
 
     if st.button("⚡ Latih Model", type="primary"):
-        with st.spinner("Melatih K-Means & Random Forest..."):
+        with st.spinner("Melatih Gaussian Mixture & HistGradientBoosting..."):
             metrics = train_dynamic_models(
                 DynamicConfig(
-                    symbol=ml_symbol, timeframe=ml_tf, features=ml_features or DEFAULT_FEATURES, cluster_k=int(ml_k),
-                    train_ratio=float(ml_ratio), rf_num_trees=int(ml_trees), rf_max_depth=int(ml_depth), target_horizon=1,
+                    symbol=ml_symbol, timeframe=ml_tf, features=ml_features or DEFAULT_FEATURES, gmm_components=int(ml_k),
+                    train_ratio=float(ml_ratio), gb_max_iter=int(ml_trees), gb_max_depth=int(ml_depth),
+                    gb_learning_rate=float(ml_learning_rate), target_horizon=1,
                 )
             )
             st.cache_data.clear()
             st.success("Pelatihan dan evaluasi temporal selesai.")
 
-    km, cls, reg, split = metrics["kmeans_metrics"], metrics["classification_metrics"], metrics["regression_metrics"], metrics["temporal_split"]
+    km, cls, reg, split = metrics["gmm_metrics"], metrics["classification_metrics"], metrics["regression_metrics"], metrics["temporal_split"]
     st.caption(f"Model aktif: **{metrics.get('symbol')} · {metrics.get('timeframe')}** · dilatih {metrics.get('trained_at', '-')} · fitur: {', '.join(metrics.get('features', []))}")
     k = st.columns(6)
-    kpi(k[0], "Silhouette", km["silhouette_score"], "K-Means", "#22d3ee")
-    kpi(k[1], "Accuracy T+1", f"{cls['accuracy'] * 100:.2f}%", "RF classifier", UP)
-    kpi(k[2], "Macro F1", cls["f1_macro"], "RF classifier", "#a78bfa")
+    kpi(k[0], "Silhouette", km["silhouette_score"], "Gaussian Mixture", "#22d3ee")
+    kpi(k[1], "Accuracy T+1", f"{cls['accuracy'] * 100:.2f}%", "HGB classifier", UP)
+    kpi(k[2], "Macro F1", cls["f1_macro"], "HGB classifier", "#a78bfa")
     kpi(k[3], "Macro precision", cls["precision_macro"], f"recall {cls['recall_macro']}", "#f472b6")
-    kpi(k[4], "MAE volatilitas", reg["mae"], "RF regressor", "#facc15")
-    kpi(k[5], "RMSE volatilitas", reg["rmse"], "RF regressor", DOWN)
+    kpi(k[4], "MAE volatilitas", reg["mae"], "HGB regressor", "#facc15")
+    kpi(k[5], "RMSE volatilitas", reg["rmse"], "HGB regressor", DOWN)
 
     sp = pd.DataFrame(
         [
@@ -750,7 +752,7 @@ with tabs[4]:
     with c3:
         fi = pd.DataFrame(metrics["feature_importances"]).sort_values("importance")
         fig = px.bar(fi, x="importance", y="feature", orientation="h", color="importance", color_continuous_scale="Tealgrn", text_auto=".3f")
-        show(fig.update_layout(coloraxis_showscale=False), 380, "Feature Importance RF")
+        show(fig.update_layout(coloraxis_showscale=False), 380, "Permutation Importance: Holdout Macro F1")
 
     tp = pd.DataFrame(metrics.get("test_predictions_preview", []))
     if not tp.empty:

@@ -2,6 +2,8 @@
 
 ## Mata Kuliah: Big Data & Analitik (Kelas A)
 
+> Revisi implementasi ML: pengelompokan risiko menggunakan GaussianMixture (GMM) dengan inisialisasi acak dari data; prediksi menggunakan HistGradientBoostingClassifier dan HistGradientBoostingRegressor. Spark menjalankan pengolahan fitur, sedangkan training GMM/HGB berjalan pada driver lokal (bukan algoritma Spark MLlib). Model memakai validasi temporal dengan embargo sesuai horizon. Evaluasi GMM mencakup BIC/AIC dan silhouette; interpretasi fitur memakai permutation importance pada holdout.
+
 **Judul Proyek:** **Arkadanta: Dynamic Big Data Intelligence Pipeline untuk Analisis, Deteksi Anomali, dan Prediksi Risiko Volatilitas Pasar Kripto Berbasis Lambda Architecture**
 
 ---
@@ -22,8 +24,8 @@ Arkadanta bersifat dinamis: pengguna dapat memilih aset, rentang tanggal, timefr
 2. Bagaimana Dynamic Pipeline Controller menentukan parser, normalisasi, dan pemeriksaan kualitas berdasarkan dataset masuk?
 3. Bagaimana mengagregasi OHLCV 5 menit menjadi 15 menit, 1 jam, 4 jam, 1 hari, atau 1 minggu dengan PySpark?
 4. Bagaimana menyediakan feature engineering dinamis untuk fitur volatilitas, teknikal, mikrostruktur pasar, dan lintas aset?
-5. Bagaimana mendeteksi anomali menggunakan *rolling Z-score*, IQR, *adaptive quantile*, atau K-Means?
-6. Bagaimana membuat label SAFE, WARNING, dan DANGER tanpa mengasumsikan ID cluster K-Means sebagai label risiko?
+5. Bagaimana mendeteksi anomali menggunakan *rolling Z-score*, IQR, *adaptive quantile*, atau Gaussian Mixture?
+6. Bagaimana membuat label SAFE, WARNING, dan DANGER tanpa mengasumsikan ID cluster Gaussian Mixture sebagai label risiko?
 7. Bagaimana melatih dan mengevaluasi prediksi T+1 dengan fitur, timeframe, target, dan parameter model yang dinamis?
 8. Bagaimana menyajikan BI, anomali, korelasi lintas aset, metrik model, dan prediksi live melalui dashboard serta FastAPI?
 
@@ -35,8 +37,8 @@ Arkadanta bersifat dinamis: pengguna dapat memilih aset, rentang tanggal, timefr
 4. Menyediakan agregasi dinamis: 5m, 15m, 1h, 4h, 1d, dan 1w.
 5. Menghasilkan fitur volatilitas, teknikal, mikrostruktur, dan korelasi lintas aset yang dapat dipilih pengguna.
 6. Mendeteksi anomali dengan metode serta ambang adaptif yang dapat dikonfigurasi.
-7. Melabeli hasil K-Means berdasarkan urutan skor risiko centroid menjadi SAFE, WARNING, dan DANGER.
-8. Memprediksi probabilitas rezim risiko dan volatilitas T+1 menggunakan Random Forest dengan validasi temporal.
+7. Melabeli hasil Gaussian Mixture berdasarkan urutan skor risiko centroid menjadi SAFE, WARNING, dan DANGER.
+8. Memprediksi probabilitas rezim risiko dan volatilitas T+1 menggunakan HistGradientBoosting dengan validasi temporal.
 9. Menyediakan dashboard BI dan live monitoring dengan konfigurasi analitik, prediksi, rentang harga, dan evaluasi model.
 
 ---
@@ -161,7 +163,7 @@ Metode yang tersedia:
 1. *Rolling Z-score* untuk lonjakan volatilitas/volume dari rata-rata bergerak.
 2. IQR untuk outlier berbasis kuartil.
 3. *Adaptive quantile* untuk nilai di atas persentil historis, misalnya 0,95.
-4. K-Means untuk rezim pasar berdasarkan kombinasi fitur.
+4. Gaussian Mixture untuk rezim pasar berdasarkan kombinasi fitur.
 
 Ambang dihitung per aset, timeframe, dan rentang historis, bukan nilai global tetap.
 
@@ -171,17 +173,17 @@ Dashboard menyajikan tren harga, volume, volatilitas, SMA/EMA, RSI, dan Bollinge
 
 Hubungan lintas aset harus disajikan sebagai hasil perhitungan, bukan asumsi bahwa selalu berlaku.
 
-## 5.5 K-Means dan Pelabelan Risiko Dinamis
+## 5.5 Gaussian Mixture dan Pelabelan Risiko Dinamis
 
 1. Pengguna memilih fitur dan nilai `k` (default 3).
 2. Fitur valid dinormalisasi dengan `StandardScaler`.
-3. K-Means dilatih pada data pelatihan.
+3. Gaussian Mixture dilatih pada data pelatihan.
 4. Centroid dinilai memakai skor risiko gabungan dari volatilitas, spike ratio, dan volume terstandarisasi.
 5. Cluster diurutkan dari skor terendah ke tertinggi sebagai SAFE, WARNING, dan DANGER.
 
 ID cluster 0, 1, atau 2 tidak langsung menjadi label karena bersifat arbitrer.
 
-## 5.6 Prediksi T+1 dengan Random Forest
+## 5.6 Prediksi T+1 dengan HistGradientBoosting
 
 - `RandomForestClassifier`: fitur waktu T memprediksi probabilitas SAFE, WARNING, dan DANGER pada T+1.
 - `RandomForestRegressor`: fitur waktu T memprediksi `max_volatility` atau target numerik lain pada T+1.
@@ -202,11 +204,11 @@ Keluaran hanya untuk analitik akademik, bukan nasihat investasi.
   "features": ["max_volatility", "spike_ratio", "rsi_14", "volume_zscore"],
   "anomaly_method": "adaptive_quantile",
   "anomaly_quantile": 0.95,
-  "cluster_k": 3,
+  "gmm_components": 3,
   "correlation_window": 30,
   "train_ratio": 0.8,
-  "rf_num_trees": 200,
-  "rf_max_depth": 10,
+  "gb_max_iter": 200,
+  "gb_max_depth": 10,
   "target_horizon": 1
 }
 ```
@@ -217,7 +219,7 @@ Data dibagi secara kronologis: data awal untuk pelatihan dan data berikutnya unt
 
 | Komponen | Metrik |
 |---|---|
-| K-Means | Silhouette Score dan interpretasi centroid |
+| Gaussian Mixture | Silhouette Score dan interpretasi centroid |
 | Klasifikasi | Accuracy, Precision, Recall, F1-Score per kelas |
 | Regresi | MAE dan RMSE |
 | Anomali | Jumlah anomali, tingkat anomali per periode, dan inspeksi sampel kejadian |
@@ -283,7 +285,7 @@ arkadanta/
 
 ## Tab 3 — Model Lab & Live Market Shield
 
-- Konfigurasi fitur, K-Means, Random Forest, horizon, dan split temporal.
+- Konfigurasi fitur, Gaussian Mixture, HistGradientBoosting, horizon, dan split temporal.
 - Centroid serta mapping SAFE/WARNING/DANGER.
 - Metrik model.
 - Candle live 5 menit.

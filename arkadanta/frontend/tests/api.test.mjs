@@ -56,6 +56,17 @@ test('successful baseline contains exactly what the backend returned', async (t)
   assert.deepEqual(await api.fetchHistoricalBaseline(), { data: baseline, isLiveBackend: true });
 });
 
+test('model requests use the selected symbol/timeframe and prediction horizon', async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  const calls = [];
+  globalThis.fetch = async (url, options) => { calls.push({ url, options }); return new Response('{}'); };
+  await api.fetchLatestModelMetrics({ symbol: 'ETHUSDT', timeframe: '15m' });
+  assert.match(calls[0].url, /symbol=ETHUSDT&timeframe=15m/);
+  await api.predictNextPeriodApi('ETHUSDT', '15m', 3);
+  assert.equal(JSON.parse(calls[1].options.body).target_horizon, 3);
+});
+
 test('live subscription forwards prices and reports disconnects without simulated quotes', (t) => {
   const original = globalThis.EventSource;
   t.after(() => { globalThis.EventSource = original; });

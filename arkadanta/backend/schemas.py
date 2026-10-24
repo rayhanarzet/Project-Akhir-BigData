@@ -1,7 +1,7 @@
 """Skema Pydantic untuk request/response API dan kontrak integrasi Orang 1 & Orang 2."""
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class IngestionAuditReport(BaseModel):
@@ -61,10 +61,12 @@ class CronStatusResponse(BaseModel):
 class DynamicConfig(BaseModel):
     """Konfigurasi dinamis sesuai Bab 5.7 Proposal Arkadanta."""
 
+    model_config = ConfigDict(extra="forbid")
+
     symbols: List[str] = Field(
         default_factory=lambda: ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
     )
-    symbol: str = "BTCUSDT"
+    symbol: str = Field(default="BTCUSDT", pattern=r"^[A-Za-z0-9]{2,30}$")
     timeframe: Literal["5m", "15m", "1h", "4h", "1d", "1w"] = "1h"
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -84,25 +86,26 @@ class DynamicConfig(BaseModel):
     rolling_window: int = Field(default=20, ge=5, le=200)
     # Parameter deteksi anomali
     anomaly_method: Literal[
-        "rolling_zscore", "iqr", "adaptive_quantile", "kmeans"
+        "rolling_zscore", "iqr", "adaptive_quantile", "gmm"
     ] = "adaptive_quantile"
     anomaly_quantile: float = Field(default=0.95, ge=0.80, le=0.999)
     anomaly_z_threshold: float = Field(default=2.5, ge=1.5, le=5.0)
     anomaly_iqr_multiplier: float = Field(default=1.5, ge=1.0, le=4.0)
-    # Parameter K-Means & Random Forest
-    cluster_k: int = Field(default=3, ge=3, le=6)
+    # Parameter Gaussian Mixture & HistGradientBoosting
+    gmm_components: int = Field(default=3, ge=3, le=6)
     correlation_window: int = Field(default=30, ge=5, le=200)
     max_lag: int = Field(default=6, ge=1, le=24)
     train_ratio: float = Field(default=0.8, ge=0.5, le=0.95)
-    rf_num_trees: int = Field(default=200, ge=20, le=500)
-    rf_max_depth: int = Field(default=10, ge=3, le=30)
+    gb_max_iter: int = Field(default=200, ge=20, le=500)
+    gb_max_depth: int = Field(default=10, ge=3, le=30)
+    gb_learning_rate: float = Field(default=0.1, gt=0, le=1)
     target_horizon: int = Field(default=1, ge=1, le=12)
     use_spark: bool = False
 
 
 class PredictRequest(BaseModel):
-    symbol: str = "BTCUSDT"
+    symbol: str = Field(default="BTCUSDT", pattern=r"^[A-Za-z0-9]{2,30}$")
     timeframe: Literal["5m", "15m", "1h", "4h", "1d", "1w"] = "1h"
     custom_features: Optional[Dict[str, float]] = None
-    current_price: Optional[float] = None
-    target_horizon: int = 1
+    current_price: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
+    target_horizon: int = Field(default=1, ge=1, le=12)

@@ -63,7 +63,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
     setRecentPrices([]);
     const [mRes, pRes, aRes] = await Promise.allSettled([
       fetchLatestModelMetrics(config),
-      predictNextPeriodApi(config.symbol, config.timeframe),
+      predictNextPeriodApi(config.symbol, config.timeframe, config.target_horizon),
       runDynamicAnalyticsApi(config),
     ]);
     if (!isActive()) return;
@@ -93,7 +93,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
     try {
       const mRes = await trainAndEvaluateModels(config);
       setMetrics(mRes);
-      const pRes = await predictNextPeriodApi(config.symbol, config.timeframe);
+      const pRes = await predictNextPeriodApi(config.symbol, config.timeframe, config.target_horizon);
       setPrediction(pRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pelatihan model gagal.');
@@ -159,7 +159,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                     ${prediction.current_price.toLocaleString()}
                   </span>
                   <span className="text-[10px] text-[#9a9a9a]">
-                    Cluster #{prediction.current_cluster_id} ({prediction.current_regime_t})
+                    Component #{prediction.current_component_id} ({prediction.current_regime_t})
                   </span>
                 </div>
 
@@ -199,7 +199,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
               {/* Class Probability Bars */}
               <div>
                 <div className="flex items-center justify-between text-xs text-[#9a9a9a] mb-2">
-                  <span>Random Forest T+1 Regime Probabilities</span>
+                  <span>HistGradientBoosting T+1 Regime Probabilities</span>
                   <span className="font-mono text-white">
                     P({predRegime}) ={' '}
                     {((prediction.probabilities_t_plus_1[predRegime] || 0) * 100).toFixed(1)}%
@@ -352,7 +352,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
             </h5>
             <h3 className="bd-card-title !text-lg flex items-center gap-2">
               <Sliders className="w-4 h-4 text-[#1d8cf8]" />
-              K-Means Risk Labeler &amp; Random Forest (T+1) Configuration
+              Gaussian Mixture Risk Labeler &amp; HistGradientBoosting (T+1) Configuration
             </h3>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -360,9 +360,9 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
               type="button"
               onClick={() => onChangeConfig({ use_spark: !config.use_spark })}
               className={`bd-btn-toggle ${config.use_spark ? 'active' : ''}`}
-              title="Toggle between Speed Layer (Scikit-Learn) and Batch Layer (PySpark MLlib)"
+              title="Pemrosesan fitur dengan Pandas atau Spark. Model GMM/HGB dilatih pada driver lokal."
             >
-              {config.use_spark ? 'Engine: PySpark MLlib' : 'Engine: Scikit-Learn'}
+              {config.use_spark ? 'Features: PySpark · ML: GMM/HGB' : 'Features: Pandas · ML: GMM/HGB'}
             </button>
             <button
               type="button"
@@ -407,14 +407,14 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-[11px] text-[#9a9a9a] mb-1">
-                K-Means Clusters (k = {config.cluster_k})
+                GMM Components ({config.gmm_components})
               </label>
               <input
                 type="number"
                 min={3}
                 max={5}
-                value={config.cluster_k}
-                onChange={(e) => onChangeConfig({ cluster_k: Number(e.target.value) || 3 })}
+                value={config.gmm_components}
+                onChange={(e) => onChangeConfig({ gmm_components: Number(e.target.value) || 3 })}
                 className="bd-input w-full font-mono"
               />
             </div>
@@ -436,16 +436,16 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
 
             <div>
               <label className="block text-[11px] text-[#9a9a9a] mb-1">
-                Random Forest Trees (n_estimators)
+                HGB Iterations (max_iter)
               </label>
               <input
                 type="number"
                 step={50}
                 min={50}
                 max={500}
-                value={config.rf_num_trees}
+                value={config.gb_max_iter}
                 onChange={(e) =>
-                  onChangeConfig({ rf_num_trees: Number(e.target.value) || 200 })
+                  onChangeConfig({ gb_max_iter: Number(e.target.value) || 200 })
                 }
                 className="bd-input w-full font-mono"
               />
@@ -453,19 +453,26 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
 
             <div>
               <label className="block text-[11px] text-[#9a9a9a] mb-1">
-                Random Forest Max Depth
+                HistGradientBoosting Max Depth
               </label>
               <input
                 type="number"
                 min={3}
                 max={25}
-                value={config.rf_max_depth}
+                value={config.gb_max_depth}
                 onChange={(e) =>
-                  onChangeConfig({ rf_max_depth: Number(e.target.value) || 10 })
+                  onChangeConfig({ gb_max_depth: Number(e.target.value) || 10 })
                 }
                 className="bd-input w-full font-mono"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#9a9a9a] mb-1">HGB Learning Rate</label>
+            <input type="number" min={0.01} max={1} step={0.01}
+              value={config.gb_learning_rate}
+              onChange={(e) => onChangeConfig({ gb_learning_rate: Number(e.target.value) || 0.1 })}
+              className="bd-input font-mono" />
           </div>
         </div>
       </div>
@@ -474,17 +481,17 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
       {metrics && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* K-Means Centroid Risk Ordering Table */}
+            {/* Gaussian Mixture Centroid Risk Ordering Table */}
             <div className="lg:col-span-7 bd-card">
               <div className="bd-card-header flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h5 className="bd-card-category">
                     Unsupervised Regime Discovery (Silhouette Score:{' '}
-                    {metrics.kmeans_metrics.silhouette_score})
+                    {metrics.gmm_metrics.silhouette_score ?? 'N/A'}) · BIC {metrics.gmm_metrics.bic.toFixed(2)} · AIC {metrics.gmm_metrics.aic.toFixed(2)}
                   </h5>
                   <h4 className="bd-card-title !text-base flex items-center gap-2">
                     <Target className="w-4 h-4 text-[#00f2c3]" />
-                    K-Means Centroid Risk Scoring &amp; Regime Mapping
+                    GMM Component Means &amp; Risk Mapping
                   </h4>
                 </div>
                 <span className="text-xs text-[#9a9a9a] font-mono">
@@ -498,19 +505,19 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                     <thead>
                       <tr>
                         <th className="text-left">Rank</th>
-                        <th className="text-left">Raw Cluster ID</th>
+                        <th className="text-left">Component ID</th>
                         <th className="text-left">Mapped Regime</th>
                         <th className="text-right">Composite Risk Score</th>
                         <th className="text-right">Train Observations</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {metrics.kmeans_metrics.centroids.map((c) => {
+                      {metrics.gmm_metrics.centroids.map((c) => {
                         const col = REGIME_COLORS[c.assigned_risk_label];
                         return (
                           <tr key={c.cluster_id}>
                             <td className="font-mono text-white">#{c.risk_rank}</td>
-                            <td className="font-mono text-[#1d8cf8]">Cluster {c.cluster_id}</td>
+                            <td className="font-mono text-[#1d8cf8]">Component {c.cluster_id}</td>
                             <td>
                               <span
                                 style={{ color: col, borderColor: col }}
@@ -534,7 +541,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
               </div>
             </div>
 
-            {/* Random Forest Feature Importance Chart */}
+            {/* HistGradientBoosting Feature Importance Chart */}
             <div className="lg:col-span-5 bd-card">
               <div className="bd-card-header flex items-center justify-between">
                 <div>
@@ -544,7 +551,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                   </h5>
                   <h4 className="bd-card-title !text-base flex items-center gap-2">
                     <Cpu className="w-4 h-4 text-[#1d8cf8]" />
-                    Random Forest Feature Importance
+                    Permutation Importance · Holdout Macro F1
                   </h4>
                 </div>
               </div>

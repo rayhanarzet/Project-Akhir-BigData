@@ -20,7 +20,7 @@ from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
 from backend.ml.model_predictor import predict_next_period
 from backend.ml.model_trainer import train_dynamic_models
 from backend.schemas import DynamicConfig, PredictRequest
-from spark_jobs.train_models import _compute_spark_centroid_risk_score
+from backend.ml.risk_labeler import DynamicRiskLabeler
 
 
 def test_multi_symbol_ingestion_and_audit():
@@ -56,7 +56,7 @@ def test_raw_binance_vision_headerless_csv():
         assert df_clean["timestamp"].iloc[0].year == 2025
 
 
-def test_analytics_ml_and_spark_centroid_parity():
+def test_analytics_ml_and_component_risk_ordering():
     from data.sample_generator import generate_synthetic_5m_ohlcv
     from backend.config import DROP_ZONE_DIR
 
@@ -80,16 +80,16 @@ def test_analytics_ml_and_spark_centroid_parity():
     assert len(attr) > 0
     assert "dominant_lag" in attr[0]
 
-    # Cek paritas rumus centroid risk score antara Scikit-Learn & PySpark
+    # Jalur Pandas/Spark memakai satu pemilik aturan skor risiko komponen.
     features = ["max_volatility", "spike_ratio", "rsi_14", "log_return"]
     dummy_centroid = [1.2, 0.8, -1.5, -2.0]
-    spark_score = _compute_spark_centroid_risk_score(dummy_centroid, features)
+    spark_score = DynamicRiskLabeler()._compute_centroid_risk_score(dummy_centroid, features)
     assert spark_score > 0
 
-    cfg = DynamicConfig(symbol="BTCUSDT", timeframe="1h", rf_num_trees=30, use_spark=False)
+    cfg = DynamicConfig(symbol="BTCUSDT", timeframe="1h", gb_max_iter=30, use_spark=False)
     metrics = train_dynamic_models(cfg)
     assert "execution_engine" in metrics
-    assert metrics["kmeans_metrics"][" regime_distribution" if False else "regime_distribution"] is not None
+    assert metrics["gmm_metrics"][" regime_distribution" if False else "regime_distribution"] is not None
 
     pred = predict_next_period(PredictRequest(symbol="BTCUSDT", timeframe="1h"))
     assert pred["predicted_regime_t_plus_1"] in ("SAFE", "WARNING", "DANGER")

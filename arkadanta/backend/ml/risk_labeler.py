@@ -1,9 +1,9 @@
-"""[ORANG 2] Clustering Risiko K-Means & Pelabelan Centroid Dinamis SAFE / WARNING / DANGER (Bab 5.5)."""
+"""[ORANG 2] Clustering Risiko Gaussian Mixture & Pelabelan Centroid Dinamis SAFE / WARNING / DANGER (Bab 5.5)."""
 
 from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
@@ -11,20 +11,24 @@ RISK_LABELS_3 = ["SAFE", "WARNING", "DANGER"]
 
 
 class DynamicRiskLabeler:
-    """Melatih StandardScaler + K-Means dan mengurutkan centroid berdasarkan skor risiko gabungan."""
+    """Melatih StandardScaler + Gaussian Mixture dan mengurutkan centroid berdasarkan skor risiko gabungan."""
 
     def __init__(self, n_clusters: int = 3, random_state: int = 42):
         self.n_clusters = max(3, n_clusters)
         self.random_state = random_state
         self.scaler = StandardScaler()
-        self.kmeans = KMeans(
-            n_clusters=self.n_clusters, random_state=self.random_state, n_init=10
+        self.gmm = GaussianMixture(
+            n_components=self.n_clusters, random_state=self.random_state,
+            covariance_type="full", reg_covar=1e-4, n_init=5,
+            init_params="random_from_data", max_iter=200,
         )
         self.feature_cols: List[str] = []
         self.cluster_to_label: Dict[int, str] = {}
         self.cluster_to_rank: Dict[int, int] = {}
         self.centroid_table: List[Dict[str, Any]] = []
-        self.silhouette: float = 0.0
+        self.silhouette: float | None = None
+        self.bic: float = 0.0
+        self.aic: float = 0.0
 
     def _compute_centroid_risk_score(
         self, centroid_z: np.ndarray, feature_cols: List[str]
@@ -59,18 +63,20 @@ class DynamicRiskLabeler:
         self.feature_cols = list(feature_cols)
         X_train = df_train[self.feature_cols].values.astype(float)
         X_scaled = self.scaler.fit_transform(X_train)
-        cluster_ids = self.kmeans.fit_predict(X_scaled)
+        if len(X_scaled) < self.n_clusters:
+            raise ValueError("Data pelatihan lebih sedikit dari jumlah komponen GMM.")
+        cluster_ids = self.gmm.fit_predict(X_scaled)
+        if not self.gmm.converged_:
+            raise ValueError("GMM belum konvergen. Kurangi jumlah komponen atau ubah fitur/data.")
+        self.bic = float(self.gmm.bic(X_scaled))
+        self.aic = float(self.gmm.aic(X_scaled))
 
         # Silhouette score (gunakan sampel maks 2000 baris agar cepat)
-        if len(X_scaled) > self.n_clusters:
-            sample_size = min(len(X_scaled), 1500)
-            self.silhouette = float(
-                silhouette_score(
-                    X_scaled[:sample_size], cluster_ids[:sample_size]
-                )
-            )
+        sample = np.random.default_rng(self.random_state).choice(len(X_scaled), min(len(X_scaled), 1500), replace=False)
+        if 1 < len(np.unique(cluster_ids[sample])) < len(sample):
+            self.silhouette = float(silhouette_score(X_scaled[sample], cluster_ids[sample]))
 
-        centroids_z = self.kmeans.cluster_centers_
+        centroids_z = self.gmm.means_
         centroids_orig = self.scaler.inverse_transform(centroids_z)
 
         scored_clusters = []
@@ -108,6 +114,7 @@ class DynamicRiskLabeler:
                 "assigned_risk_label": label,
                 "composite_risk_score": round(float(r_score), 4),
                 "train_sample_count": count_in_train,
+                "mixture_weight": round(float(self.gmm.weights_[cid]), 6),
             }
             for f_idx, f_name in enumerate(self.feature_cols):
                 row_info[f"centroid_{f_name}"] = round(
@@ -123,6 +130,6 @@ class DynamicRiskLabeler:
         """Memetakan baris data ke cluster_id dan label risiko (SAFE/WARNING/DANGER)."""
         X = df[self.feature_cols].values.astype(float)
         X_scaled = self.scaler.transform(X)
-        cids = self.kmeans.predict(X_scaled)
+        cids = self.gmm.predict(X_scaled)
         labels = [self.cluster_to_label[int(c)] for c in cids]
         return cids, labels

@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 
 
@@ -16,7 +16,7 @@ def detect_anomalies(
     rolling_window: int = 20,
     feature_cols: List[str] | None = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Mendeteksi anomali dengan metode Rolling Z-Score, IQR, Adaptive Quantile, atau K-Means."""
+    """Mendeteksi anomali dengan metode Rolling Z-Score, IQR, Adaptive Quantile, atau Gaussian Mixture."""
     if df.empty:
         return df, {"total_anomalies": 0, "anomaly_rate_pct": 0.0, "threshold_info": {}}
 
@@ -52,7 +52,7 @@ def detect_anomalies(
             data.loc[idx, "is_anomaly"] = is_anom
             threshold_info["per_symbol_threshold"][sym] = round(upper_bound, 6)
 
-        elif method == "kmeans":
+        elif method == "gmm":
             cols = [
                 c
                 for c in (feature_cols or ["max_volatility", "spike_ratio", "volume_zscore"])
@@ -61,15 +61,17 @@ def detect_anomalies(
             if not cols:
                 cols = [target_col]
             X = StandardScaler().fit_transform(grp[cols].fillna(0.0).values)
-            km = KMeans(n_clusters=3, random_state=42, n_init=10)
-            labels = km.fit_predict(X)
-            dists = np.linalg.norm(X - km.cluster_centers_[labels], axis=1)
-            # Cluster dengan rata-rata volatilitas tertinggi + jarak terjauh
-            cluster_vol = [s.iloc[labels == k].mean() if np.any(labels == k) else -1 for k in range(3)]
-            danger_cluster = int(np.argmax(cluster_vol))
-            dist_thresh = float(np.quantile(dists, quantile))
-            is_anom = (labels == danger_cluster) & (dists >= np.quantile(dists, 0.70)) | (dists >= dist_thresh)
-            data.loc[idx, "anomaly_score"] = np.round(dists, 4)
+            if len(X) < 3:
+                raise ValueError("Deteksi anomali GMM membutuhkan minimal tiga candle.")
+            mixture = GaussianMixture(n_components=3, random_state=42, n_init=3,
+                                      init_params="random_from_data", reg_covar=1e-4, max_iter=200)
+            mixture.fit(X)
+            if not mixture.converged_:
+                raise ValueError("GMM deteksi anomali belum konvergen.")
+            scores = -mixture.score_samples(X)
+            dist_thresh = float(np.quantile(scores, quantile))
+            is_anom = scores >= dist_thresh
+            data.loc[idx, "anomaly_score"] = np.round(scores, 4)
             data.loc[idx, "is_anomaly"] = is_anom
             threshold_info["per_symbol_threshold"][sym] = round(dist_thresh, 4)
 

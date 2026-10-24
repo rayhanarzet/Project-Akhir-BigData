@@ -1,4 +1,4 @@
-"""[ORANG 2] Evaluasi model K-Means, Random Forest Classifier, dan Random Forest Regressor (Bab 5.8)."""
+"""[ORANG 2] Evaluasi model Gaussian Mixture, HistGradientBoosting Classifier, dan HistGradientBoosting Regressor (Bab 5.8)."""
 
 from typing import Any, Dict, List
 import numpy as np

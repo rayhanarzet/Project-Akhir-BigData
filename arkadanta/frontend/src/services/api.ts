@@ -81,12 +81,13 @@ export function trainAndEvaluateModels(cfg: DynamicConfigPayload): Promise<Model
   return request('/api/ml/train', post(cfg), 120000);
 }
 
-export function fetchLatestModelMetrics(_cfg: DynamicConfigPayload): Promise<ModelMetricsResponse> {
-  return request('/api/models/metrics', {}, 120000);
+export function fetchLatestModelMetrics(cfg: DynamicConfigPayload): Promise<ModelMetricsResponse> {
+  const params = new URLSearchParams({ symbol: cfg.symbol, timeframe: cfg.timeframe });
+  return request(`/api/models/metrics?${params}`, {}, 120000);
 }
 
-export function predictNextPeriodApi(symbol: string, timeframe: Timeframe): Promise<PredictionResponse> {
-  return request('/api/ml/predict', post({ symbol, timeframe, target_horizon: 1 }), 120000);
+export function predictNextPeriodApi(symbol: string, timeframe: Timeframe, targetHorizon = 1): Promise<PredictionResponse> {
+  return request('/api/ml/predict', post({ symbol, timeframe, target_horizon: targetHorizon }), 120000);
 }
 
 export interface LiveQuote {

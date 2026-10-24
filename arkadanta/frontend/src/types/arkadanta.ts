@@ -1,6 +1,6 @@
 export type RiskRegime = 'SAFE' | 'WARNING' | 'DANGER';
 export type Timeframe = '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
-export type AnomalyMethod = 'adaptive_quantile' | 'rolling_zscore' | 'iqr' | 'kmeans';
+export type AnomalyMethod = 'adaptive_quantile' | 'rolling_zscore' | 'iqr' | 'gmm';
 
 export interface AssetBaseline {
   symbol: string;
@@ -142,16 +142,19 @@ export interface CentroidRecord {
 }
 
 export interface ModelMetricsResponse {
+  model_version: string;
+  feature_importance_method: string;
   trained_at: string;
   execution_engine?: string;
   symbol: string;
   timeframe: Timeframe;
   target_horizon: number;
   features: string[];
-  cluster_k: number;
+  gmm_components: number;
   train_ratio: number;
-  rf_num_trees: number;
-  rf_max_depth: number;
+  gb_max_iter: number;
+  gb_max_depth: number;
+  gb_learning_rate: number;
   temporal_split: {
     total_samples: number;
     train_samples: number;
@@ -161,8 +164,11 @@ export interface ModelMetricsResponse {
     test_start: string;
     test_end: string;
   };
-  kmeans_metrics: {
-    silhouette_score: number;
+  gmm_metrics: {
+    silhouette_score: number | null;
+    bic: number;
+    aic: number;
+    converged: boolean;
     cluster_to_label: Record<string, RiskRegime>;
     centroids: CentroidRecord[];
     regime_distribution: Record<RiskRegime, number>;
@@ -193,7 +199,7 @@ export interface PredictionResponse {
   timeframe: Timeframe;
   target_horizon: number;
   current_price: number;
-  current_cluster_id: number;
+  current_component_id: number;
   current_regime_t: RiskRegime;
   predicted_regime_t_plus_1: RiskRegime;
   probabilities_t_plus_1: Record<RiskRegime, number>;
@@ -217,12 +223,13 @@ export interface DynamicConfigPayload {
   anomaly_quantile: number;
   anomaly_z_threshold: number;
   anomaly_iqr_multiplier: number;
-  cluster_k: number;
+  gmm_components: number;
   correlation_window: number;
   max_lag: number;
   train_ratio: number;
-  rf_num_trees: number;
-  rf_max_depth: number;
+  gb_max_iter: number;
+  gb_max_depth: number;
+  gb_learning_rate: number;
   target_horizon: number;
   use_spark?: boolean;
 }
