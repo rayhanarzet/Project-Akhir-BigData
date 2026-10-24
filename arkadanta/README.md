@@ -63,19 +63,39 @@ arkadanta/
 
 ## Cara Menjalankan
 
-### 1. Menjalankan Frontend Dashboard (React + TypeScript + TailwindCSS)
+### Opsi 1: Menjalankan Semua Layanan dalam 1 Perintah (Otomatis)
+Dari direktori root `E:\GIT\Project-Akhir-BigData`, cukup jalankan satu perintah berikut di PowerShell atau Command Prompt:
+```powershell
+.\run-all.bat
+```
+*(atau `.\run-all.ps1` / `.\arkadanta\start.bat`)*
+
+Script tersebut secara otomatis mendeteksi environment `.venv`, memeriksa dependensi `node_modules`, dan menyalakan ketiga layanan sekaligus:
+1. **FastAPI Backend Server**: `http://localhost:8000` (Swagger Docs: `http://localhost:8000/docs`)
+2. **React + TypeScript Frontend (FE)**: `http://localhost:5173`
+3. **Streamlit + Plotly Interactive Dashboard**: `http://localhost:8501`
+
+---
+
+### Opsi 2: Menjalankan Secara Manual per Komponen
+
+#### 1. Menjalankan Frontend Dashboard (React + TypeScript + TailwindCSS)
 ```powershell
 cd E:\GIT\Project-Akhir-BigData\arkadanta\frontend
 npm run dev
 ```
 Buka `http://localhost:5173` di browser.
 
-### 2. Menjalankan Backend API (FastAPI Python)
+#### 2. Menjalankan Backend API (FastAPI Python)
 ```powershell
 cd E:\GIT\Project-Akhir-BigData\arkadanta
-py -3.11 -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
+..\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8000
 ```
 Dokumentasi Swagger UI tersedia di `http://localhost:8000/docs`.
+
+#### 3. Menjalankan Streamlit Dashboard
+```powershell
+cd E:\GIT\Project-Akhir-BigData\arkadanta
+..\.venv\Scripts\python.exe -m streamlit run frontend/app.py --server.port 8501
+```
+Buka `http://localhost:8501` di browser.

@@ -13,7 +13,11 @@ import {
   DynamicConfigPayload,
   HistoricalBaselineResponse,
 } from './types/arkadanta';
-import { fetchHistoricalBaseline, SUPPORTED_SYMBOLS } from './services/api';
+import {
+  buildFallbackBaseline,
+  fetchHistoricalBaseline,
+  SUPPORTED_SYMBOLS,
+} from './services/api';
 import { Tab1Ingestion } from './components/Tab1Ingestion';
 import { Tab2AnalyticsBI } from './components/Tab2AnalyticsBI';
 import { Tab3ModelLabShield } from './components/Tab3ModelLabShield';
@@ -30,7 +34,9 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tab2' | 'tab3' | 'tab1'>('tab2');
   const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>('blue');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [baseline, setBaseline] = useState<HistoricalBaselineResponse | null>(null);
+  const [baseline, setBaseline] = useState<HistoricalBaselineResponse>(
+    () => buildFallbackBaseline()
+  );
   const [isLiveBackend, setIsLiveBackend] = useState<boolean>(false);
 
   const [config, setConfig] = useState<DynamicConfigPayload>({
@@ -59,6 +65,7 @@ export const App: React.FC = () => {
     rf_num_trees: 200,
     rf_max_depth: 10,
     target_horizon: 1,
+    use_spark: false,
   });
 
   const loadBaseline = async () => {

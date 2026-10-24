@@ -1,6 +1,9 @@
 import pandas as pd
 
-from src.schema import REQUIRED_COLUMNS, NUMERIC_COLUMNS
+try:
+    from src.schema import REQUIRED_COLUMNS, NUMERIC_COLUMNS
+except ImportError:
+    from schema import REQUIRED_COLUMNS, NUMERIC_COLUMNS
 
 
 def validate_data(df):

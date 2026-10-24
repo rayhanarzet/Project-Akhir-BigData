@@ -17,7 +17,18 @@ from spark_jobs.feature_pipeline import spark_compute_features
 from spark_jobs.train_models import spark_train_and_evaluate
 
 
-def run_batch_job(symbol: str = "BTCUSDT", timeframe: str = "1h") -> dict:
+def run_batch_job(
+    symbol: str = "BTCUSDT",
+    timeframe: str = "1h",
+    feature_cols: list[str] | None = None,
+    cluster_k: int = 3,
+    train_ratio: float = 0.8,
+    rf_num_trees: int = 100,
+    rf_max_depth: int = 10,
+    ma_period: int = 20,
+    rsi_period: int = 14,
+    rolling_window: int = 20,
+) -> dict:
     ensure_sample_data_exists([symbol])
     input_csv = str(DROP_ZONE_DIR / f"{symbol.upper()}_5m_clean.csv")
 
@@ -31,8 +42,20 @@ def run_batch_job(symbol: str = "BTCUSDT", timeframe: str = "1h") -> dict:
     try:
         df_raw = spark.read.csv(input_csv, header=True, inferSchema=True)
         df_agg = spark_aggregate_timeframe(df_raw, timeframe=timeframe)
-        df_feat = spark_compute_features(df_agg)
-        metrics = spark_train_and_evaluate(df_feat, feature_cols=DEFAULT_FEATURES)
+        df_feat = spark_compute_features(
+            df_agg,
+            ma_period=ma_period,
+            rsi_period=rsi_period,
+            rolling_window=rolling_window,
+        )
+        metrics = spark_train_and_evaluate(
+            df_feat,
+            feature_cols=feature_cols or DEFAULT_FEATURES,
+            cluster_k=cluster_k,
+            train_ratio=train_ratio,
+            rf_num_trees=rf_num_trees,
+            rf_max_depth=rf_max_depth,
+        )
         return metrics
     finally:
         spark.stop()

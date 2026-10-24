@@ -660,8 +660,8 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => 
         <div className="lg:col-span-5 bd-card">
           <div className="bd-card-header flex items-center justify-between">
             <div>
-              <h5 className="bd-card-category">Cross-Asset Matrix</h5>
-              <h4 className="bd-card-title !text-base">Pearson Correlation &amp; Market Risk</h4>
+              <h5 className="bd-card-category">Cross-Asset Matrix &amp; Lag Attribution</h5>
+              <h4 className="bd-card-title !text-base">Pearson Correlation &amp; Past Factor Drivers</h4>
             </div>
             {correlation && (
               <div className="text-right">
@@ -674,7 +674,7 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => 
               </div>
             )}
           </div>
-          <div className="bd-card-body">
+          <div className="bd-card-body space-y-4">
             {correlation && (
               <div className="overflow-x-auto">
                 <table className="bd-table">
@@ -715,6 +715,36 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig }) => 
                 </table>
               </div>
             )}
+
+            {analytics?.historical_factor_attribution &&
+              analytics.historical_factor_attribution.length > 0 && (
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-[11px] uppercase tracking-wider text-[#9a9a9a] mb-2">
+                    Historical Lag Drivers (Past Periods T-k &rarr; Today T Volatility)
+                  </p>
+                  <div className="space-y-1.5">
+                    {analytics.historical_factor_attribution.slice(0, 4).map((attr) => (
+                      <div
+                        key={attr.feature}
+                        className="bg-[#1e1e2f] px-3 py-2 rounded border border-[#2b3553] flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <span className="font-mono text-white font-semibold">
+                            {attr.feature}
+                          </span>
+                          <span className="ml-2 px-1.5 py-0.5 rounded bg-[#1d8cf8]/20 text-[#1d8cf8] font-mono text-[10px]">
+                            Lag {attr.dominant_lag}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[#00f2c3]">
+                          r = {attr.correlation_to_today >= 0 ? '+' : ''}
+                          {attr.correlation_to_today.toFixed(3)} ({attr.abs_impact_score.toFixed(1)}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         </div>
 

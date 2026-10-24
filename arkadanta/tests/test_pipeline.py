@@ -2,7 +2,15 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-import pytest
+
+try:
+    import pytest
+    parametrize = pytest.mark.parametrize
+except ImportError:
+    def parametrize(*args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE_DIR / "src"))
@@ -10,7 +18,7 @@ sys.path.insert(0, str(BASE_DIR / "src"))
 from dynamic_pipeline import run_pipeline
 
 
-@pytest.mark.parametrize(
+@parametrize(
     "filename",
     ["sample.csv", "sample.json"],
 )

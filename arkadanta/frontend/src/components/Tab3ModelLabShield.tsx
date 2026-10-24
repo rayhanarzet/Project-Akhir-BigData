@@ -329,21 +329,34 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig }) 
       <div className="bd-card">
         <div className="bd-card-header flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h5 className="bd-card-category">Dynamic Machine Learning Pipeline</h5>
+            <h5 className="bd-card-category">
+              Dynamic Machine Learning Pipeline{' '}
+              {metrics?.execution_engine ? `— ${metrics.execution_engine}` : ''}
+            </h5>
             <h3 className="bd-card-title !text-lg flex items-center gap-2">
               <Sliders className="w-4 h-4 text-[#1d8cf8]" />
               K-Means Risk Labeler &amp; Random Forest (T+1) Configuration
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={handleTrainModel}
-            disabled={training}
-            className="bd-btn-primary flex items-center gap-2 disabled:opacity-50"
-          >
-            <Play className="w-3.5 h-3.5" />
-            {training ? 'Training Models (Temporal Split)...' : 'Train & Evaluate Models'}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onChangeConfig({ use_spark: !config.use_spark })}
+              className={`bd-btn-toggle ${config.use_spark ? 'active' : ''}`}
+              title="Toggle between Speed Layer (Scikit-Learn) and Batch Layer (PySpark MLlib)"
+            >
+              {config.use_spark ? 'Engine: PySpark MLlib' : 'Engine: Scikit-Learn'}
+            </button>
+            <button
+              type="button"
+              onClick={handleTrainModel}
+              disabled={training}
+              className="bd-btn-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              {training ? 'Training Models (Temporal Split)...' : 'Train & Evaluate Models'}
+            </button>
+          </div>
         </div>
 
         <div className="bd-card-body space-y-5">

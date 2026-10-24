@@ -89,9 +89,20 @@ export interface CandlePoint {
   anomaly_reason: string;
 }
 
+export interface HistoricalFactorAttribution {
+  feature: string;
+  dominant_lag: string;
+  lag_periods: number;
+  correlation_to_today: number;
+  abs_impact_score: number;
+  lag_profile: Record<string, number>;
+  bi_insight: string;
+}
+
 export interface AnalyticsRunResponse {
   symbol: string;
   timeframe: Timeframe;
+  execution_engine?: string;
   total_candles: number;
   selected_features: string[];
   anomaly_summary: {
@@ -104,6 +115,7 @@ export interface AnalyticsRunResponse {
       per_symbol_threshold: Record<string, number>;
     };
   };
+  historical_factor_attribution?: HistoricalFactorAttribution[];
   anomalies_log: CandlePoint[];
   series: CandlePoint[];
 }
@@ -131,6 +143,7 @@ export interface CentroidRecord {
 
 export interface ModelMetricsResponse {
   trained_at: string;
+  execution_engine?: string;
   symbol: string;
   timeframe: Timeframe;
   target_horizon: number;
@@ -211,4 +224,5 @@ export interface DynamicConfigPayload {
   rf_num_trees: number;
   rf_max_depth: number;
   target_horizon: number;
+  use_spark?: boolean;
 }

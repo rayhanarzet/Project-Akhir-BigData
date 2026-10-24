@@ -575,6 +575,15 @@ with tabs[2]:
         fig.update_layout(polar=dict(bgcolor="rgba(0,0,0,0)", radialaxis=dict(range=[0, 1], gridcolor=GRID), angularaxis=dict(gridcolor=GRID)))
         show(fig, 480, "Profil Fitur (persentil)")
 
+    if res.get("historical_factor_attribution"):
+        section("Atribusi Faktor Historis (Periode Lampau T-k → Volatilitas Hari Ini T)")
+        attr_df = pd.DataFrame(res["historical_factor_attribution"])
+        st.dataframe(
+            attr_df[["feature", "dominant_lag", "correlation_to_today", "abs_impact_score", "bi_insight"]],
+            width="stretch",
+            hide_index=True,
+        )
+
     section("Log Kejadian Anomali")
     log = pd.DataFrame(res["anomalies_log"])
     if not log.empty:

@@ -9,6 +9,8 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        timeout: 6000,
+        proxyTimeout: 6000,
         configure: (proxy) => {
           // Hindari spam log ECONNREFUSED di terminal saat FastAPI belum dinyalakan
           proxy.on('error', (_err, _req, res) => {

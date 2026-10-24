@@ -1,6 +1,9 @@
 """[ORANG 1 - KONTRAK & STUB] Dynamic Pipeline Controller berbasis aturan (Bab 4.2 & 4.3)."""
 
 from datetime import datetime, timezone
+import os
+import shutil
+import subprocess
 from typing import Dict, Optional, Tuple
 import uuid
 import pandas as pd
@@ -12,6 +15,18 @@ from backend.ingestion.processors.json_processor import parse_json_bytes
 from backend.ingestion.schema_validator import map_and_validate_schema
 from backend.schemas import IngestionAuditReport
 from data.sample_generator import load_audit_logs, save_audit_logs
+
+
+def _try_sync_to_hdfs(local_path: str, hdfs_dir: str) -> str:
+    """Mencoba mengunggah file bersih ke HDFS jika binary hdfs tersedia dan diaktifkan."""
+    if os.getenv("ARKADANTA_ENABLE_HDFS", "0") != "1" or not shutil.which("hdfs"):
+        return "QUEUED_DROP_ZONE"
+    try:
+        subprocess.run(["hdfs", "dfs", "-mkdir", "-p", hdfs_dir], check=True, timeout=10)
+        subprocess.run(["hdfs", "dfs", "-put", "-f", local_path, hdfs_dir], check=True, timeout=15)
+        return "SYNCED"
+    except Exception:
+        return "LOCAL_FALLBACK"
 
 
 def run_dynamic_ingestion_pipeline(
@@ -29,10 +44,17 @@ def run_dynamic_ingestion_pipeline(
         df_raw, custom_mapping=custom_mapping, default_symbol=default_symbol
     )
 
-    # 1. Konversi timestamp ke UTC
+    # 1. Konversi timestamp ke UTC (mendukung epoch s, ms, us, ns maupun string ISO)
     if pd.api.types.is_numeric_dtype(df["timestamp"]):
-        max_ts = df["timestamp"].dropna().max()
-        unit = "ms" if max_ts > 1e11 else "s"
+        max_ts = float(df["timestamp"].dropna().max()) if not df["timestamp"].dropna().empty else 0.0
+        if max_ts > 1e17:
+            unit = "ns"
+        elif max_ts > 1e14:
+            unit = "us"
+        elif max_ts > 1e11:
+            unit = "ms"
+        else:
+            unit = "s"
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit=unit, utc=True, errors="coerce")
     else:
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -64,8 +86,12 @@ def run_dynamic_ingestion_pipeline(
     imputed_volume_rows = int(df["volume"].isna().sum())
     df["volume"] = df["volume"].fillna(0.0)
 
-    # 5. Sanity check (high < low, harga <= 0, volume < 0)
-    bad_hl = df["high"] < df["low"]
+    # 5. Sanity check (high < low, harga <= 0, volume < 0, atau high/low tidak konsisten terhadap open/close)
+    bad_hl = (
+        (df["high"] < df["low"])
+        | (df["high"] < df[["open", "close"]].max(axis=1))
+        | (df["low"] > df[["open", "close"]].min(axis=1))
+    )
     bad_price = (df["open"] <= 0) | (df["high"] <= 0) | (df["low"] <= 0) | (df["close"] <= 0)
     bad_vol = df["volume"] < 0
 
@@ -90,8 +116,20 @@ def run_dynamic_ingestion_pipeline(
     symbols_detected = sorted(df_clean["coin_symbol"].unique().tolist())
     primary_sym = symbols_detected[0] if symbols_detected else default_symbol.upper()
 
-    out_path = DROP_ZONE_DIR / f"{primary_sym}_5m_clean.csv"
-    df_clean.to_csv(out_path, index=False)
+    # 6. Simpan/gabungkan secara terpisah per coin_symbol ke Drop Zone (mendukung file multi-aset)
+    saved_paths = []
+    hdfs_status = "QUEUED_DROP_ZONE"
+    for sym, sym_df in df_clean.groupby("coin_symbol"):
+        sym_path = DROP_ZONE_DIR / f"{sym}_5m_clean.csv"
+        sym_clean = sym_df.sort_values("timestamp").reset_index(drop=True)
+        sym_clean.to_csv(sym_path, index=False)
+        saved_paths.append(f"data/drop_zone/{sym_path.name}")
+        hdfs_status = _try_sync_to_hdfs(str(sym_path), f"{HDFS_BASE_PATH}symbol={sym}/")
+
+    if not saved_paths:
+        out_path = DROP_ZONE_DIR / f"{primary_sym}_5m_clean.csv"
+        df_clean.to_csv(out_path, index=False)
+        saved_paths.append(f"data/drop_zone/{out_path.name}")
 
     rows_after = len(df_clean)
     quality_score = round((rows_after / max(rows_before, 1)) * 100.0, 2)
@@ -103,7 +141,7 @@ def run_dynamic_ingestion_pipeline(
         format_detected=fmt,
         selected_pipeline=f"{fmt}Parser -> SchemaAliasMapper -> DedupSorter -> ForwardFillImputer -> OHLCVSanityGuard",
         column_mapping=applied_mapping,
-        symbols_detected=symbols_detected,
+        symbols_detected=symbols_detected or [primary_sym],
         rows_before=rows_before,
         rows_after=rows_after,
         duplicates_removed=duplicates_removed,
@@ -111,9 +149,13 @@ def run_dynamic_ingestion_pipeline(
         imputed_volume_rows=imputed_volume_rows,
         rejected_rows=rejected_rows,
         error_reasons=error_reasons,
-        drop_zone_path=f"data/drop_zone/{out_path.name}",
-        hdfs_target_path=f"{HDFS_BASE_PATH}symbol={primary_sym}/",
-        nifi_hdfs_status="QUEUED_DROP_ZONE",
+        drop_zone_path=", ".join(saved_paths),
+        hdfs_target_path=(
+            f"{HDFS_BASE_PATH}symbol={primary_sym}/"
+            if len(symbols_detected) <= 1
+            else f"{HDFS_BASE_PATH}symbol={{multi:{','.join(symbols_detected)}}}/"
+        ),
+        nifi_hdfs_status=hdfs_status,
         quality_score_pct=quality_score,
     )
 

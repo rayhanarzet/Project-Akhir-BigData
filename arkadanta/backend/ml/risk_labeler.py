@@ -45,7 +45,12 @@ class DynamicRiskLabeler:
         score = 0.0
         total_w = 0.0
         for idx, w in weights:
-            val = abs(float(centroid_z[idx])) if feature_cols[idx] == "rsi_14" else float(centroid_z[idx])
+            col_name = feature_cols[idx]
+            val = (
+                abs(float(centroid_z[idx]))
+                if col_name in ("rsi_14", "log_return", "periodic_return", "co_change")
+                else float(centroid_z[idx])
+            )
             score += val * w
             total_w += w
         return score / max(total_w, 1e-8)

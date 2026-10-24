@@ -1,17 +1,50 @@
 """[ORANG 2] PySpark MLlib K-Means Centroid Risk Labeling & Random Forest T+1 Trainer (Bab 5.5 - 5.8)."""
 
 from typing import Any, Dict, List
-from pyspark.ml.clustering import KMeans as SparkKMeans
-from pyspark.ml.evaluation import (
-    ClusteringEvaluator,
-    MulticlassClassificationEvaluator,
-    RegressionEvaluator,
-)
-from pyspark.ml.feature import StandardScaler as SparkScaler, VectorAssembler
-from pyspark.ml.classification import RandomForestClassifier as SparkRFClassifier
-from pyspark.ml.regression import RandomForestRegressor as SparkRFRegressor
-from pyspark.sql import DataFrame, Window
-from pyspark.sql import functions as F
+
+try:
+    from pyspark.ml.clustering import KMeans as SparkKMeans
+    from pyspark.ml.evaluation import (
+        ClusteringEvaluator,
+        MulticlassClassificationEvaluator,
+        RegressionEvaluator,
+    )
+    from pyspark.ml.feature import StandardScaler as SparkScaler, VectorAssembler
+    from pyspark.ml.classification import RandomForestClassifier as SparkRFClassifier
+    from pyspark.ml.regression import RandomForestRegressor as SparkRFRegressor
+    from pyspark.sql import DataFrame, Window
+    from pyspark.sql import functions as F
+except ImportError:
+    DataFrame = Any  # type: ignore
+
+
+def _compute_spark_centroid_risk_score(
+    centroid_z: Any, feature_cols: List[str]
+) -> float:
+    """Menghitung skor risiko gabungan centroid yang identik dengan DynamicRiskLabeler (Scikit-Learn)."""
+    weights = []
+    for idx, col in enumerate(feature_cols):
+        if col in ("max_volatility", "avg_volatility", "rolling_volatility", "hl_range", "bb_width"):
+            weights.append((idx, 1.5))
+        elif col in ("spike_ratio", "volume_zscore"):
+            weights.append((idx, 1.2))
+        elif col == "rsi_14":
+            weights.append((idx, 0.6))
+        else:
+            weights.append((idx, 0.8))
+
+    score = 0.0
+    total_w = 0.0
+    for idx, w in weights:
+        col_name = feature_cols[idx]
+        val = (
+            abs(float(centroid_z[idx]))
+            if col_name in ("rsi_14", "log_return", "periodic_return", "co_change")
+            else float(centroid_z[idx])
+        )
+        score += val * w
+        total_w += w
+    return score / max(total_w, 1e-8)
 
 
 def spark_train_and_evaluate(
@@ -22,11 +55,18 @@ def spark_train_and_evaluate(
     rf_num_trees: int = 100,
     rf_max_depth: int = 10,
 ) -> Dict[str, Any]:
-    """Melatih K-Means + Random Forest di PySpark MLlib dengan pengurutan skor risiko centroid."""
+    """Melatih K-Means + Random Forest di PySpark MLlib dengan pengurutan skor risiko centroid & temporal split."""
     assembler = VectorAssembler(
         inputCols=feature_cols, outputCol="raw_features", handleInvalid="keep"
     )
     assembled = assembler.transform(df_features)
+
+    # Temporal split terlebih dahulu sebelum fit StandardScaler & K-Means (mencegah data leakage)
+    ts_bounds_init = assembled.selectExpr(
+        f"percentile_approx(unix_timestamp(timestamp), {train_ratio}) as split_ts"
+    ).collect()[0]["split_ts"]
+
+    train_raw = assembled.filter(F.unix_timestamp("timestamp") <= ts_bounds_init)
 
     scaler = SparkScaler(
         inputCol="raw_features",
@@ -34,7 +74,8 @@ def spark_train_and_evaluate(
         withStd=True,
         withMean=True,
     )
-    scaler_model = scaler.fit(assembled)
+    scaler_model = scaler.fit(train_raw)
+    scaled_train = scaler_model.transform(train_raw)
     scaled_df = scaler_model.transform(assembled)
 
     kmeans = SparkKMeans(
@@ -43,17 +84,20 @@ def spark_train_and_evaluate(
         k=cluster_k,
         seed=42,
     )
-    km_model = kmeans.fit(scaled_df)
+    km_model = kmeans.fit(scaled_train)
     clustered_df = km_model.transform(scaled_df)
 
     evaluator_clust = ClusteringEvaluator(
         featuresCol="scaled_features", predictionCol="cluster_id"
     )
-    silhouette = float(evaluator_clust.evaluate(clustered_df))
+    silhouette = float(evaluator_clust.evaluate(km_model.transform(scaled_train)))
 
-    # Urutkan centroid berdasarkan skor risiko gabungan (bukan ID mentah 0/1/2)
+    # Urutkan centroid berdasarkan skor risiko gabungan berbobot (SAFE -> WARNING -> DANGER)
     centers = km_model.clusterCenters()
-    scored = [(cid, float(sum(centers[cid]))) for cid in range(cluster_k)]
+    scored = [
+        (cid, _compute_spark_centroid_risk_score(centers[cid], feature_cols))
+        for cid in range(cluster_k)
+    ]
     scored.sort(key=lambda x: x[1])
 
     rank_map = {cid: idx for idx, (cid, _) in enumerate(scored)}
@@ -67,13 +111,8 @@ def spark_train_and_evaluate(
         .dropna(subset=["target_risk_t1", "target_vol_t1"])
     )
 
-    # Temporal split berdasarkan persentil timestamp
-    ts_bounds = labeled_df.selectExpr(
-        f"percentile_approx(unix_timestamp(timestamp), {train_ratio}) as split_ts"
-    ).collect()[0]["split_ts"]
-
-    train_df = labeled_df.filter(F.unix_timestamp("timestamp") <= ts_bounds)
-    test_df = labeled_df.filter(F.unix_timestamp("timestamp") > ts_bounds)
+    train_df = labeled_df.filter(F.unix_timestamp("timestamp") <= ts_bounds_init)
+    test_df = labeled_df.filter(F.unix_timestamp("timestamp") > ts_bounds_init)
 
     rf_clf = SparkRFClassifier(
         featuresCol="scaled_features",
@@ -109,7 +148,7 @@ def spark_train_and_evaluate(
     ).evaluate(pred_reg)
 
     return {
-        "engine": "PySpark MLlib",
+        "engine": "PySpark MLlib (Batch Layer)",
         "silhouette_score": round(silhouette, 4),
         "cluster_rank_map": rank_map,
         "accuracy": round(float(acc), 4),

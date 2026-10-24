@@ -112,8 +112,33 @@ def train_dynamic_models(config: DynamicConfig) -> Dict[str, Any]:
 
     regime_counts = df_clean["current_risk_label"].value_counts().to_dict()
 
+    execution_engine = "Scikit-Learn + Pandas (Speed Layer)"
+    spark_batch_metrics = None
+    if config.use_spark:
+        try:
+            from spark_jobs.batch_analytics import run_batch_job
+
+            spark_batch_metrics = run_batch_job(
+                symbol=symbol,
+                timeframe=config.timeframe,
+                feature_cols=feature_cols,
+                cluster_k=config.cluster_k,
+                train_ratio=config.train_ratio,
+                rf_num_trees=config.rf_num_trees,
+                rf_max_depth=config.rf_max_depth,
+                ma_period=config.ma_period,
+                rsi_period=config.rsi_period,
+                rolling_window=config.rolling_window,
+            )
+            execution_engine = "PySpark MLlib (Batch Layer)"
+        except Exception as spark_exc:
+            execution_engine = "Scikit-Learn + Pandas (PySpark Local Fallback)"
+            spark_batch_metrics = {"status": "fallback", "reason": str(spark_exc)}
+
     artifact_meta = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
+        "execution_engine": execution_engine,
+        "spark_batch_metrics": spark_batch_metrics,
         "symbol": symbol,
         "timeframe": config.timeframe,
         "target_horizon": horizon,

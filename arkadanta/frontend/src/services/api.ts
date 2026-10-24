@@ -14,6 +14,20 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 6000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const SUPPORTED_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT'];
 export const SUPPORTED_TIMEFRAMES: Timeframe[] = ['5m', '15m', '1h', '4h', '1d', '1w'];
 export const AVAILABLE_FEATURES = [
@@ -146,6 +160,7 @@ function buildFallbackSeries(cfg: DynamicConfigPayload): AnalyticsRunResponse {
   return {
     symbol: sym,
     timeframe: cfg.timeframe,
+    execution_engine: cfg.use_spark ? 'PySpark SQL (Batch Layer)' : 'Pandas + Scikit-Learn (Speed Layer)',
     total_candles: series.length,
     selected_features: cfg.features,
     anomaly_summary: {
@@ -158,8 +173,94 @@ function buildFallbackSeries(cfg: DynamicConfigPayload): AnalyticsRunResponse {
         per_symbol_threshold: { [sym]: Number(thresh.toFixed(5)) },
       },
     },
+    historical_factor_attribution: [
+      {
+        feature: 'max_volatility',
+        dominant_lag: 'T-1',
+        lag_periods: 1,
+        correlation_to_today: 0.642,
+        abs_impact_score: 64.2,
+        lag_profile: { 'T-1': 0.642, 'T-2': 0.481, 'T-3': 0.312 },
+        bi_insight:
+          'Perubahan max_volatility pada 1 periode lalu (T-1) berkorelasi positif (+0.642) terhadap lonjakan risiko saat ini (T).',
+      },
+      {
+        feature: 'bb_width',
+        dominant_lag: 'T-1',
+        lag_periods: 1,
+        correlation_to_today: 0.584,
+        abs_impact_score: 58.4,
+        lag_profile: { 'T-1': 0.584, 'T-2': 0.449, 'T-3': 0.305 },
+        bi_insight:
+          'Perubahan bb_width pada 1 periode lalu (T-1) berkorelasi positif (+0.584) terhadap lonjakan risiko saat ini (T).',
+      },
+      {
+        feature: 'volume_zscore',
+        dominant_lag: 'T-1',
+        lag_periods: 1,
+        correlation_to_today: 0.491,
+        abs_impact_score: 49.1,
+        lag_profile: { 'T-1': 0.491, 'T-2': 0.318, 'T-3': 0.194 },
+        bi_insight:
+          'Perubahan volume_zscore pada 1 periode lalu (T-1) berkorelasi positif (+0.491) terhadap lonjakan risiko saat ini (T).',
+      },
+      {
+        feature: 'spike_ratio',
+        dominant_lag: 'T-2',
+        lag_periods: 2,
+        correlation_to_today: 0.415,
+        abs_impact_score: 41.5,
+        lag_profile: { 'T-1': 0.382, 'T-2': 0.415, 'T-3': 0.241 },
+        bi_insight:
+          'Perubahan spike_ratio pada 2 periode lalu (T-2) berkorelasi positif (+0.415) terhadap lonjakan risiko saat ini (T).',
+      },
+    ],
     anomalies_log: anomalies.slice(-25).reverse(),
     series,
+  };
+}
+
+export function buildFallbackBaseline(): HistoricalBaselineResponse {
+  const nowIso = new Date().toISOString();
+  return {
+    pipeline_status: 'ONLINE',
+    hdfs_cluster_path: '/user/arkadanta/data/clean/crypto/',
+    assets: SUPPORTED_SYMBOLS.map((sym) => ({
+      symbol: sym,
+      rows_5m: 2000,
+      start_timestamp: new Date(Date.now() - 2000 * 300_000).toISOString(),
+      end_timestamp: nowIso,
+      latest_close: BASE_PRICES[sym],
+      avg_volume_5m: sym === 'BTCUSDT' ? 68.42 : 512.8,
+      hdfs_partition: `/user/arkadanta/data/clean/crypto/symbol=${sym}/`,
+      status: 'READY',
+    })),
+    audit_logs: SUPPORTED_SYMBOLS.map((sym, idx) => ({
+      run_id: `init_${sym.toLowerCase()}_00${idx + 1}`,
+      timestamp: nowIso,
+      source_name: `${sym.toLowerCase()}_historical_5m.csv`,
+      format_detected: 'CSV',
+      selected_pipeline:
+        'StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer',
+      column_mapping: { open_time: 'timestamp', symbol: 'coin_symbol', vol: 'volume' },
+      symbols_detected: [sym],
+      rows_before: 2018,
+      rows_after: 2000,
+      duplicates_removed: 11,
+      imputed_ohlc_rows: 4,
+      imputed_volume_rows: 2,
+      rejected_rows: 7,
+      error_reasons: {
+        high_less_than_low: 5,
+        non_positive_price: 2,
+        negative_volume: 0,
+        invalid_timestamp: 0,
+      },
+      drop_zone_path: `data/drop_zone/${sym}_5m_clean.csv`,
+      hdfs_target_path: `/user/arkadanta/data/clean/crypto/symbol=${sym}/`,
+      nifi_hdfs_status: 'SYNCED',
+      quality_score_pct: 99.1,
+    })),
   };
 }
 
@@ -168,54 +269,14 @@ export async function fetchHistoricalBaseline(): Promise<{
   isLiveBackend: boolean;
 }> {
   try {
-    const res = await fetch(`${API_BASE}/api/historical-baseline`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/historical-baseline`);
     if (!res.ok) throw new Error('API Error');
     const data = await res.json();
     return { data, isLiveBackend: true };
   } catch {
-    const nowIso = new Date().toISOString();
     return {
       isLiveBackend: false,
-      data: {
-        pipeline_status: 'ONLINE',
-        hdfs_cluster_path: '/user/arkadanta/data/clean/crypto/',
-        assets: SUPPORTED_SYMBOLS.map((sym) => ({
-          symbol: sym,
-          rows_5m: 2000,
-          start_timestamp: new Date(Date.now() - 2000 * 300_000).toISOString(),
-          end_timestamp: nowIso,
-          latest_close: BASE_PRICES[sym],
-          avg_volume_5m: sym === 'BTCUSDT' ? 68.42 : 512.8,
-          hdfs_partition: `/user/arkadanta/data/clean/crypto/symbol=${sym}/`,
-          status: 'READY',
-        })),
-        audit_logs: SUPPORTED_SYMBOLS.map((sym, idx) => ({
-          run_id: `init_${sym.toLowerCase()}_00${idx + 1}`,
-          timestamp: nowIso,
-          source_name: `${sym.toLowerCase()}_historical_5m.csv`,
-          format_detected: 'CSV',
-          selected_pipeline:
-            'StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer',
-          column_mapping: { open_time: 'timestamp', symbol: 'coin_symbol', vol: 'volume' },
-          symbols_detected: [sym],
-          rows_before: 2018,
-          rows_after: 2000,
-          duplicates_removed: 11,
-          imputed_ohlc_rows: 4,
-          imputed_volume_rows: 2,
-          rejected_rows: 7,
-          error_reasons: {
-            high_less_than_low: 5,
-            non_positive_price: 2,
-            negative_volume: 0,
-            invalid_timestamp: 0,
-          },
-          drop_zone_path: `data/drop_zone/${sym}_5m_clean.csv`,
-          hdfs_target_path: `/user/arkadanta/data/clean/crypto/symbol=${sym}/`,
-          nifi_hdfs_status: 'SYNCED',
-          quality_score_pct: 99.1,
-        })),
-      },
+      data: buildFallbackBaseline(),
     };
   }
 }
@@ -232,10 +293,10 @@ export async function uploadDatasetFile(
     if (customMappingJson.trim()) {
       form.append('column_mapping_json', customMappingJson.trim());
     }
-    const res = await fetch(`${API_BASE}/api/ingestion/upload`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ingestion/upload`, {
       method: 'POST',
       body: form,
-    });
+    }, 15000);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.detail || 'Upload gagal');
@@ -276,11 +337,11 @@ export async function triggerBinanceLiveSync(
   limit: number
 ): Promise<{ synced_assets: number; reports: IngestionAuditReport[] }> {
   try {
-    const res = await fetch(`${API_BASE}/api/ingestion/live-sync`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ingestion/live-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbols, interval: '5m', limit }),
-    });
+    }, 15000);
     if (!res.ok) throw new Error('Sync error');
     return await res.json();
   } catch {
@@ -327,7 +388,7 @@ let localCronState: CronStatus = {
 
 export async function fetchCronStatus(): Promise<CronStatus> {
   try {
-    const res = await fetch(`${API_BASE}/api/ingestion/cron-status`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/ingestion/cron-status`);
     if (!res.ok) throw new Error('Cron status error');
     return await res.json();
   } catch {
@@ -342,7 +403,7 @@ export async function updateCronConfig(
   limit: number = 60
 ): Promise<CronStatus> {
   try {
-    const res = await fetch(`${API_BASE}/api/ingestion/cron-config`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ingestion/cron-config`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -373,11 +434,11 @@ export async function runDynamicAnalyticsApi(
   cfg: DynamicConfigPayload
 ): Promise<AnalyticsRunResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/analytics/run`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/analytics/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
-    });
+    }, 10000);
     if (!res.ok) throw new Error('Analytics error');
     return await res.json();
   } catch {
@@ -399,7 +460,7 @@ export async function fetchCrossAssetCorrelation(
       rolling_window: String(rollingWindow),
       max_lag: '6',
     });
-    const res = await fetch(`${API_BASE}/api/analytics/correlation?${params}`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/analytics/correlation?${params}`, {}, 8000);
     if (!res.ok) throw new Error('Corr error');
     return await res.json();
   } catch {
@@ -448,11 +509,11 @@ export async function trainAndEvaluateModels(
   cfg: DynamicConfigPayload
 ): Promise<ModelMetricsResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/ml/train`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ml/train`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
-    });
+    }, 20000);
     if (!res.ok) throw new Error('Train error');
     return await res.json();
   } catch {
@@ -464,7 +525,7 @@ export async function fetchLatestModelMetrics(
   cfg: DynamicConfigPayload
 ): Promise<ModelMetricsResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/models/metrics`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/models/metrics`, {}, 8000);
     if (!res.ok) throw new Error('Metrics error');
     return await res.json();
   } catch {
@@ -479,6 +540,9 @@ function buildFallbackMetrics(cfg: DynamicConfigPayload): ModelMetricsResponse {
   const now = Date.now();
   return {
     trained_at: new Date().toISOString(),
+    execution_engine: cfg.use_spark
+      ? 'PySpark MLlib (Batch Layer)'
+      : 'Scikit-Learn + Pandas (Speed Layer)',
     symbol: cfg.symbol,
     timeframe: cfg.timeframe,
     target_horizon: cfg.target_horizon,
@@ -579,11 +643,11 @@ export async function predictNextPeriodApi(
   timeframe: Timeframe
 ): Promise<PredictionResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/ml/predict`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/ml/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol, timeframe, target_horizon: 1 }),
-    });
+    }, 8000);
     if (!res.ok) throw new Error('Predict error');
     return await res.json();
   } catch {
