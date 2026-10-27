@@ -25,6 +25,8 @@ if exist "%REPO_ROOT%\.venv\Scripts\python.exe" (
     set "PY_EXE=%REPO_ROOT%\.venv\Scripts\python.exe"
 ) else if exist "%ARKADANTA_DIR%\.venv\Scripts\python.exe" (
     set "PY_EXE=%ARKADANTA_DIR%\.venv\Scripts\python.exe"
+) else if exist "%ARKADANTA_DIR%\.venv-windows\Scripts\python.exe" (
+    set "PY_EXE=%ARKADANTA_DIR%\.venv-windows\Scripts\python.exe"
 ) else (
     set "PY_EXE=python"
 )

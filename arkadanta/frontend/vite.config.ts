@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/historical-hdfs': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        timeout: 15 * 60 * 1000,
+        proxyTimeout: 15 * 60 * 1000,
+      },
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

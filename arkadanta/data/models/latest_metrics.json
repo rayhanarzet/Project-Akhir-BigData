@@ -1,9 +1,9 @@
 {
-  "trained_at": "2026-10-24T07:57:16.323596+00:00",
+  "trained_at": "2026-10-27T08:39:15.851627+00:00",
   "execution_engine": "Scikit-Learn + Pandas (PySpark Local Fallback)",
   "spark_batch_metrics": {
     "status": "fallback",
-    "reason": "No module named 'pyspark'"
+    "reason": "[FIELD_NOT_FOUND] No such struct field `ema_20` in `coin_symbol`, `open`, `high`, `low`, `close`, `volume`, `max_volatility`, `avg_volatility`, `timestamp`, `log_return`, `hl_range`, `co_change`, `rolling_volatility`, `spike_ratio`, `sma_20`, `bb_width`, `rsi_14`, `upper_wick_ratio`, `lower_wick_ratio`, `body_ratio`, `volume_zscore`. SQLSTATE: 42704"
   },
   "symbol": "BTCUSDT",
   "timeframe": "1h",
@@ -31,144 +31,144 @@
   "rf_num_trees": 200,
   "rf_max_depth": 10,
   "temporal_split": {
-    "total_samples": 51,
-    "train_samples": 40,
-    "test_samples": 11,
+    "total_samples": 57,
+    "train_samples": 45,
+    "test_samples": 12,
     "train_start": "2026-10-21 03:00:00+00:00",
-    "train_end": "2026-10-22 18:00:00+00:00",
-    "test_start": "2026-10-22 19:00:00+00:00",
-    "test_end": "2026-10-23 05:00:00+00:00"
+    "train_end": "2026-10-22 23:00:00+00:00",
+    "test_start": "2026-10-23 00:00:00+00:00",
+    "test_end": "2026-10-24 07:00:00+00:00"
   },
   "kmeans_metrics": {
-    "silhouette_score": 0.2826,
+    "silhouette_score": 0.2295,
     "cluster_to_label": {
-      "2": "SAFE",
-      "0": "WARNING",
+      "0": "SAFE",
+      "2": "WARNING",
       "1": "DANGER"
     },
     "centroids": [
       {
-        "cluster_id": 2,
+        "cluster_id": 0,
         "risk_rank": 1,
         "assigned_risk_label": "SAFE",
-        "composite_risk_score": -0.4312,
+        "composite_risk_score": -0.4669,
         "train_sample_count": 18,
         "centroid_max_volatility": 0.022548,
-        "z_max_volatility": -0.8891,
+        "z_max_volatility": -0.8413,
         "centroid_spike_ratio": 0.802069,
-        "z_spike_ratio": -0.7039,
+        "z_spike_ratio": -0.7907,
         "centroid_rsi_14": 80.702926,
-        "z_rsi_14": 0.4675,
+        "z_rsi_14": 0.5948,
         "centroid_volume_zscore": -0.241718,
-        "z_volume_zscore": -0.4122,
+        "z_volume_zscore": -0.4767,
         "centroid_bb_width": 0.123623,
-        "z_bb_width": -0.6957,
+        "z_bb_width": -0.7832,
         "centroid_hl_range": 0.022548,
-        "z_hl_range": -0.8891,
+        "z_hl_range": -0.8413,
         "centroid_avg_volatility": 0.007201,
-        "z_avg_volatility": -0.3203,
+        "z_avg_volatility": -0.4203,
         "centroid_rolling_volatility": 0.021275,
-        "z_rolling_volatility": -0.7546,
+        "z_rolling_volatility": -0.8088,
         "centroid_log_return": -0.001519,
-        "z_log_return": -0.1485,
+        "z_log_return": -0.0602,
         "centroid_co_change": -0.001716,
-        "z_co_change": -0.0632,
+        "z_co_change": -0.0052,
         "centroid_sma_20": 68766.069377,
-        "z_sma_20": -0.6411,
+        "z_sma_20": -0.7519,
         "centroid_ema_20": 68522.182559,
-        "z_ema_20": -0.7187,
+        "z_ema_20": -0.833,
         "centroid_buy_sell_pressure_ratio": 0.489872,
-        "z_buy_sell_pressure_ratio": -0.0369,
+        "z_buy_sell_pressure_ratio": -0.001,
         "centroid_body_ratio": 0.282164,
-        "z_body_ratio": -0.3214,
+        "z_body_ratio": -0.2751,
         "centroid_lower_wick_ratio": 0.306868,
-        "z_lower_wick_ratio": -0.0921,
+        "z_lower_wick_ratio": -0.1209,
         "centroid_upper_wick_ratio": 0.410967,
-        "z_upper_wick_ratio": 0.4671
+        "z_upper_wick_ratio": 0.4374
       },
       {
-        "cluster_id": 0,
+        "cluster_id": 2,
         "risk_rank": 2,
         "assigned_risk_label": "WARNING",
-        "composite_risk_score": 0.3469,
+        "composite_risk_score": 0.2029,
         "train_sample_count": 9,
         "centroid_max_volatility": 0.073143,
-        "z_max_volatility": 0.4515,
+        "z_max_volatility": 0.0464,
         "centroid_spike_ratio": 2.131693,
-        "z_spike_ratio": 1.1705,
+        "z_spike_ratio": 1.0798,
         "centroid_rsi_14": 82.445683,
-        "z_rsi_14": 0.602,
+        "z_rsi_14": 0.7153,
         "centroid_volume_zscore": 1.187352,
-        "z_volume_zscore": 1.2672,
+        "z_volume_zscore": 1.0106,
         "centroid_bb_width": 0.152127,
-        "z_bb_width": -0.3115,
+        "z_bb_width": -0.3824,
         "centroid_hl_range": 0.073143,
-        "z_hl_range": 0.4515,
+        "z_hl_range": 0.0464,
         "centroid_avg_volatility": 0.016466,
-        "z_avg_volatility": 1.347,
+        "z_avg_volatility": 1.1072,
         "centroid_rolling_volatility": 0.023927,
-        "z_rolling_volatility": -0.533,
+        "z_rolling_volatility": -0.6399,
         "centroid_log_return": 0.024576,
-        "z_log_return": 0.5136,
+        "z_log_return": 0.4752,
         "centroid_co_change": 0.026118,
-        "z_co_change": 0.709,
+        "z_co_change": 0.6184,
         "centroid_sma_20": 68804.86379,
-        "z_sma_20": -0.6288,
+        "z_sma_20": -0.7415,
         "centroid_ema_20": 68980.709284,
-        "z_ema_20": -0.5818,
+        "z_ema_20": -0.7071,
         "centroid_buy_sell_pressure_ratio": 0.523055,
-        "z_buy_sell_pressure_ratio": 0.6493,
+        "z_buy_sell_pressure_ratio": 0.6747,
         "centroid_body_ratio": 0.584753,
-        "z_body_ratio": 0.7082,
+        "z_body_ratio": 0.7333,
         "centroid_lower_wick_ratio": 0.233746,
-        "z_lower_wick_ratio": -0.3572,
+        "z_lower_wick_ratio": -0.3642,
         "centroid_upper_wick_ratio": 0.181501,
-        "z_upper_wick_ratio": -0.4271
+        "z_upper_wick_ratio": -0.4069
       },
       {
         "cluster_id": 1,
         "risk_rank": 3,
         "assigned_risk_label": "DANGER",
-        "composite_risk_score": 0.4759,
-        "train_sample_count": 14,
-        "centroid_max_volatility": 0.088292,
-        "z_max_volatility": 0.8529,
-        "centroid_spike_ratio": 1.409593,
-        "z_spike_ratio": 0.1525,
-        "centroid_rsi_14": 61.844018,
-        "z_rsi_14": -0.988,
-        "centroid_volume_zscore": -0.133115,
-        "z_volume_zscore": -0.2846,
-        "centroid_bb_width": 0.256444,
-        "z_bb_width": 1.0947,
-        "centroid_hl_range": 0.088292,
-        "z_hl_range": 0.8529,
-        "centroid_avg_volatility": 0.006457,
-        "z_avg_volatility": -0.4542,
-        "centroid_rolling_volatility": 0.046026,
-        "z_rolling_volatility": 1.3128,
-        "centroid_log_return": -0.00115,
-        "z_log_return": -0.1392,
-        "centroid_co_change": -0.012933,
-        "z_co_change": -0.3745,
-        "centroid_sma_20": 74631.429935,
-        "z_sma_20": 1.2285,
-        "centroid_ema_20": 75278.210969,
-        "z_ema_20": 1.298,
-        "centroid_buy_sell_pressure_ratio": 0.473767,
-        "z_buy_sell_pressure_ratio": -0.37,
-        "centroid_body_ratio": 0.364244,
-        "z_body_ratio": -0.0421,
-        "centroid_lower_wick_ratio": 0.428305,
-        "z_lower_wick_ratio": 0.3481,
-        "centroid_upper_wick_ratio": 0.207451,
-        "z_upper_wick_ratio": -0.326
+        "composite_risk_score": 0.4593,
+        "train_sample_count": 19,
+        "centroid_max_volatility": 0.114673,
+        "z_max_volatility": 0.775,
+        "centroid_spike_ratio": 1.533022,
+        "z_spike_ratio": 0.2376,
+        "centroid_rsi_14": 59.045269,
+        "z_rsi_14": -0.9023,
+        "centroid_volume_zscore": 0.190326,
+        "z_volume_zscore": -0.0271,
+        "centroid_bb_width": 0.244955,
+        "z_bb_width": 0.9231,
+        "centroid_hl_range": 0.114673,
+        "z_hl_range": 0.775,
+        "centroid_avg_volatility": 0.008984,
+        "z_avg_volatility": -0.1263,
+        "centroid_rolling_volatility": 0.050764,
+        "z_rolling_volatility": 1.0694,
+        "centroid_log_return": -0.006777,
+        "z_log_return": -0.1681,
+        "centroid_co_change": -0.014338,
+        "z_co_change": -0.288,
+        "centroid_sma_20": 75520.333535,
+        "z_sma_20": 1.0636,
+        "centroid_ema_20": 75650.427311,
+        "z_ema_20": 1.1241,
+        "centroid_buy_sell_pressure_ratio": 0.474272,
+        "z_buy_sell_pressure_ratio": -0.3186,
+        "centroid_body_ratio": 0.338699,
+        "z_body_ratio": -0.0867,
+        "centroid_lower_wick_ratio": 0.42945,
+        "z_lower_wick_ratio": 0.287,
+        "centroid_upper_wick_ratio": 0.231852,
+        "z_upper_wick_ratio": -0.2217
       }
     ],
     "regime_distribution": {
       "SAFE": 18,
       "WARNING": 9,
-      "DANGER": 25
+      "DANGER": 31
     }
   },
   "classification_metrics": {
@@ -193,7 +193,7 @@
         "precision": 1.0,
         "recall": 1.0,
         "f1_score": 1.0,
-        "support": 11
+        "support": 12
       }
     },
     "labels": [
@@ -215,128 +215,88 @@
       [
         0,
         0,
-        11
+        12
       ]
     ]
   },
   "regression_metrics": {
-    "mae": 0.079744,
-    "rmse": 0.087553
+    "mae": 0.088018,
+    "rmse": 0.096341
   },
   "feature_importances": [
     {
       "feature": "rolling_volatility",
-      "importance": 0.2076
+      "importance": 0.1965
     },
     {
       "feature": "bb_width",
-      "importance": 0.1342
+      "importance": 0.1292
     },
     {
       "feature": "ema_20",
-      "importance": 0.1047
+      "importance": 0.1188
     },
     {
       "feature": "upper_wick_ratio",
-      "importance": 0.1005
+      "importance": 0.1147
     },
     {
       "feature": "sma_20",
-      "importance": 0.0936
+      "importance": 0.0982
     },
     {
       "feature": "rsi_14",
-      "importance": 0.066
+      "importance": 0.0607
     },
     {
       "feature": "avg_volatility",
-      "importance": 0.0399
+      "importance": 0.0383
     },
     {
       "feature": "max_volatility",
-      "importance": 0.0363
+      "importance": 0.0372
     },
     {
       "feature": "hl_range",
-      "importance": 0.0324
-    },
-    {
-      "feature": "log_return",
-      "importance": 0.0307
-    },
-    {
-      "feature": "spike_ratio",
-      "importance": 0.0305
+      "importance": 0.0364
     },
     {
       "feature": "lower_wick_ratio",
-      "importance": 0.0298
+      "importance": 0.0326
+    },
+    {
+      "feature": "spike_ratio",
+      "importance": 0.0271
     },
     {
       "feature": "volume_zscore",
-      "importance": 0.0269
-    },
-    {
-      "feature": "co_change",
-      "importance": 0.0261
+      "importance": 0.0263
     },
     {
       "feature": "body_ratio",
-      "importance": 0.0224
+      "importance": 0.0245
+    },
+    {
+      "feature": "log_return",
+      "importance": 0.023
+    },
+    {
+      "feature": "co_change",
+      "importance": 0.0191
     },
     {
       "feature": "buy_sell_pressure_ratio",
-      "importance": 0.0184
+      "importance": 0.0175
     }
   ],
   "test_predictions_preview": [
-    {
-      "timestamp": "2026-10-22 19:00:00+00:00",
-      "close": 81494.39,
-      "actual_risk_t1": "DANGER",
-      "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.124208,
-      "predicted_vol_t1": 0.109332
-    },
-    {
-      "timestamp": "2026-10-22 20:00:00+00:00",
-      "close": 81279.07,
-      "actual_risk_t1": "DANGER",
-      "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.194906,
-      "predicted_vol_t1": 0.10224
-    },
-    {
-      "timestamp": "2026-10-22 21:00:00+00:00",
-      "close": 81484.98,
-      "actual_risk_t1": "DANGER",
-      "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.25488,
-      "predicted_vol_t1": 0.109538
-    },
-    {
-      "timestamp": "2026-10-22 22:00:00+00:00",
-      "close": 66866.4502,
-      "actual_risk_t1": "DANGER",
-      "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.230475,
-      "predicted_vol_t1": 0.104709
-    },
-    {
-      "timestamp": "2026-10-22 23:00:00+00:00",
-      "close": 72130.3644,
-      "actual_risk_t1": "DANGER",
-      "predicted_risk_t1": "DANGER",
-      "actual_vol_t1": 0.138224,
-      "predicted_vol_t1": 0.107518
-    },
     {
       "timestamp": "2026-10-23 00:00:00+00:00",
       "close": 72810.6091,
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.006797,
-      "predicted_vol_t1": 0.095441
+      "predicted_vol_t1": 0.137988
     },
     {
       "timestamp": "2026-10-23 01:00:00+00:00",
@@ -344,7 +304,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.17606,
-      "predicted_vol_t1": 0.077274
+      "predicted_vol_t1": 0.108889
     },
     {
       "timestamp": "2026-10-23 02:00:00+00:00",
@@ -352,7 +312,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.158039,
-      "predicted_vol_t1": 0.097148
+      "predicted_vol_t1": 0.144555
     },
     {
       "timestamp": "2026-10-23 03:00:00+00:00",
@@ -360,7 +320,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.159084,
-      "predicted_vol_t1": 0.094
+      "predicted_vol_t1": 0.124821
     },
     {
       "timestamp": "2026-10-23 04:00:00+00:00",
@@ -368,7 +328,7 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.154631,
-      "predicted_vol_t1": 0.085899
+      "predicted_vol_t1": 0.123373
     },
     {
       "timestamp": "2026-10-23 05:00:00+00:00",
@@ -376,7 +336,55 @@
       "actual_risk_t1": "DANGER",
       "predicted_risk_t1": "DANGER",
       "actual_vol_t1": 0.001191,
-      "predicted_vol_t1": 0.086886
+      "predicted_vol_t1": 0.125457
+    },
+    {
+      "timestamp": "2026-10-23 06:00:00+00:00",
+      "close": 81808.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.002493,
+      "predicted_vol_t1": 0.097155
+    },
+    {
+      "timestamp": "2026-10-24 03:00:00+00:00",
+      "close": 80977.92,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.003122,
+      "predicted_vol_t1": 0.105838
+    },
+    {
+      "timestamp": "2026-10-24 04:00:00+00:00",
+      "close": 80880.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.002056,
+      "predicted_vol_t1": 0.110947
+    },
+    {
+      "timestamp": "2026-10-24 05:00:00+00:00",
+      "close": 80776.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.001625,
+      "predicted_vol_t1": 0.110757
+    },
+    {
+      "timestamp": "2026-10-24 06:00:00+00:00",
+      "close": 80790.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.002712,
+      "predicted_vol_t1": 0.12197
+    },
+    {
+      "timestamp": "2026-10-24 07:00:00+00:00",
+      "close": 80732.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.000433,
+      "predicted_vol_t1": 0.120353
     }
   ]
 }

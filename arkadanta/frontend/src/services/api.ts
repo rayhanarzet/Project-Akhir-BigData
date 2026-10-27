@@ -1,6 +1,7 @@
 ﻿import {
   AnalyticsRunResponse, CorrelationResponse, CronStatus, DynamicConfigPayload,
-  HistoricalBaselineResponse, IngestionAuditReport, ModelMetricsResponse,
+  HistoricalBaselineResponse, HistoricalHdfsRunRequest, HistoricalHdfsRunResponse,
+  IngestionAuditReport, ModelMetricsResponse,
   PredictionResponse, Timeframe,
 } from '../types/arkadanta';
 
@@ -128,4 +129,8 @@ export function subscribeMarket(onEvent: (event: MarketEvent) => void, onError: 
     source.onerror = null;
     source.close();
   };
+}
+
+export function runHistoricalHdfsPipeline(payload: HistoricalHdfsRunRequest): Promise<HistoricalHdfsRunResponse> {
+  return request('/api/historical-hdfs/run', post(payload), 15 * 60 * 1000);
 }

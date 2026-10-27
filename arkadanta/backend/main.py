@@ -16,6 +16,7 @@ from data.storage import ResearchDataError
 
 from backend.api.analytics_routes import router as analytics_router
 from backend.api.ingestion_routes import router as ingestion_router
+from backend.api.historical_hdfs_routes import router as historical_hdfs_router
 from backend.api.model_routes import router as model_router
 from backend.api.prediction_routes import router as prediction_router
 from backend.api.market_routes import router as market_router
@@ -61,6 +62,7 @@ def root():
 
 
 app.include_router(ingestion_router)
+app.include_router(historical_hdfs_router)
 app.include_router(analytics_router)
 app.include_router(model_router)
 app.include_router(prediction_router)

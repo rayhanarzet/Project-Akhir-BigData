@@ -57,4 +57,19 @@ DEFAULT_FEATURES = [
 HDFS_BASE_PATH = os.getenv(
     "ARKADANTA_HDFS_PATH", "/user/arkadanta/data/clean/crypto/"
 )
+HISTORICAL_HDFS_URI = os.getenv(
+    "ARKADANTA_HISTORICAL_HDFS_URI", "hdfs://127.0.0.1:9000"
+).rstrip("/")
+HISTORICAL_HDFS_RAW_PATH = os.getenv(
+    "ARKADANTA_HISTORICAL_HDFS_RAW_PATH",
+    "/arkadanta/raw",
+)
+HISTORICAL_HDFS_OUTPUT_PATH = os.getenv(
+    "ARKADANTA_HISTORICAL_HDFS_OUTPUT_PATH",
+    "/tmp/arkadanta-historical/processed",
+)
+HISTORICAL_OUTPUT_MODE = os.getenv(
+    "ARKADANTA_HISTORICAL_OUTPUT_MODE", "local"
+).strip().lower()
+HISTORICAL_LOCAL_OUTPUT_PATH = PROCESSED_DIR / "historical_hdfs"
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
