@@ -2,6 +2,8 @@
 
 **Analisis, Deteksi Anomali, dan Prediksi Risiko Volatilitas Pasar Kripto Berbasis Lambda Architecture**
 
+Panduan operasional Windows + Ubuntu WSL, termasuk startup HDFS/NiFi, dashboard, ML, dan troubleshooting: **[START.md](../START.md)**.
+
 ---
 
 ## Mode Penelitian: Data Nyata
