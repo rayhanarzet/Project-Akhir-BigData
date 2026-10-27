@@ -5,6 +5,8 @@ import {
   CronStatus,
   DynamicConfigPayload,
   HistoricalBaselineResponse,
+  HistoricalHdfsRunRequest,
+  HistoricalHdfsRunResponse,
   IngestionAuditReport,
   ModelMetricsResponse,
   PredictionResponse,
@@ -444,6 +446,25 @@ export async function runDynamicAnalyticsApi(
   } catch {
     return buildFallbackSeries(cfg);
   }
+}
+
+export async function runHistoricalHdfsPipeline(
+  payload: HistoricalHdfsRunRequest
+): Promise<HistoricalHdfsRunResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/api/historical-hdfs/run`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    15 * 60 * 1000
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Pipeline historis HDFS gagal');
+  }
+  return res.json();
 }
 
 export async function fetchCrossAssetCorrelation(

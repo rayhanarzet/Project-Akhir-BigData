@@ -54,6 +54,7 @@ def spark_train_and_evaluate(
     train_ratio: float = 0.8,
     rf_num_trees: int = 100,
     rf_max_depth: int = 10,
+    model_output_path: str | None = None,
 ) -> Dict[str, Any]:
     """Melatih K-Means + Random Forest di PySpark MLlib dengan pengurutan skor risiko centroid & temporal split."""
     assembler = VectorAssembler(
@@ -147,10 +148,18 @@ def spark_train_and_evaluate(
         labelCol="target_vol_t1", predictionCol="prediction", metricName="mae"
     ).evaluate(pred_reg)
 
+    if model_output_path:
+        # Persist all fitted MLlib stages needed to reproduce inference later.
+        scaler_model.write().overwrite().save(f"{model_output_path}/scaler")
+        km_model.write().overwrite().save(f"{model_output_path}/kmeans")
+        clf_model.write().overwrite().save(f"{model_output_path}/classifier")
+        reg_model.write().overwrite().save(f"{model_output_path}/regressor")
+
     return {
         "engine": "PySpark MLlib (Batch Layer)",
         "silhouette_score": round(silhouette, 4),
         "cluster_rank_map": rank_map,
+        "features": feature_cols,
         "accuracy": round(float(acc), 4),
         "f1_score": round(float(f1), 4),
         "rmse": round(float(rmse), 6),

@@ -186,6 +186,45 @@ export interface ModelMetricsResponse {
   feature_importances: { feature: string; importance: number }[];
 }
 
+export interface HistoricalHdfsRunRequest {
+  symbol: string;
+  timeframe: Timeframe;
+  start_date?: string;
+  end_date?: string;
+  features: string[];
+  cluster_k: number;
+  train_ratio: number;
+  rf_num_trees: number;
+  rf_max_depth: number;
+}
+
+export interface HistoricalHdfsRunResponse {
+  run_id: string;
+  data_source: string;
+  output_storage: string;
+  input_path: string;
+  curated_path: string;
+  model_path: string | null;
+  metrics_path: string;
+  output_format: string;
+  model_persisted: boolean;
+  symbol: string;
+  timeframe: Timeframe;
+  raw_valid_rows: number;
+  feature_rows: number;
+  data_start: string;
+  data_end: string;
+  requested_start: string;
+  requested_end: string;
+  silhouette_score: number;
+  accuracy: number;
+  f1_score: number;
+  rmse: number;
+  mae: number;
+  cluster_rank_map: Record<string, number>;
+  features: string[];
+}
+
 export interface PredictionResponse {
   timestamp: string;
   candle_timestamp: string;

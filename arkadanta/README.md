@@ -63,6 +63,48 @@ arkadanta/
 
 ## Cara Menjalankan
 
+### Jalur tambahan untuk data historis NiFi dan HDFS
+
+Alur lokal Arkadanta tetap sama. Untuk demo batch historis, jalankan NiFi secara
+terpisah dan arahkan file CSV OHLCV 5 menit ke `/arkadanta/raw`. Pipeline membaca
+CSV dari direktori tersebut dan memfilter simbol yang dipilih sebelum memproses
+data dengan PySpark dan melatih model Spark MLlib. Path input ini ditetapkan di
+konfigurasi backend sehingga tidak perlu diisi setiap kali menjalankan pipeline.
+
+Atur konfigurasi sebelum menyalakan FastAPI:
+
+```powershell
+$env:ARKADANTA_HISTORICAL_HDFS_URI = "hdfs://127.0.0.1:9000"
+$env:ARKADANTA_HISTORICAL_HDFS_RAW_PATH = "/arkadanta/raw"
+$env:ARKADANTA_HISTORICAL_OUTPUT_MODE = "local"
+```
+
+Kemudian buka dashboard React dan pilih **Historical HDFS Batch**, atau gunakan
+`POST /api/historical-hdfs/run`. Endpoint menerima aset, timeframe, dan rentang
+tanggal (maksimum 365 hari); sumber input tetap `/arkadanta/raw`. Job menerima format Binance
+Kline standar 12 kolom tanpa header maupun CSV ber-header
+`timestamp, open, high, low, close, volume`. `coin_symbol` opsional untuk file
+yang hanya berisi satu aset; jika tidak ada, simbol diambil dari pilihan aset.
+Hasil API menunjukkan path input, rentang timestamp yang benar-benar terbaca,
+metrik evaluasi, serta lokasi output dan model.
+
+Secara default, input dibaca dari HDFS sedangkan fitur (CSV) dan metrik (JSON)
+disimpan melalui filesystem Python di `data/processed/historical_hdfs/` pada
+mesin backend. Ini menghindari kebutuhan izin tulis HDFS dan `winutils.exe` pada
+Windows. Model MLlib dilatih dan dievaluasi pada run tersebut, tetapi tidak
+disimpan sebagai artefak dalam mode lokal. Jika admin memberi hak tulis pada
+direktori output HDFS, set `ARKADANTA_HISTORICAL_OUTPUT_MODE=hdfs` dan atur
+`ARKADANTA_HISTORICAL_HDFS_OUTPUT_PATH`; mode itu menyimpan Parquet dan artefak
+model di HDFS.
+
+Spark perlu dapat menjangkau NameNode dan memakai konfigurasi Hadoop lokal.
+Jika distribusi Hadoop memerlukan `HADOOP_CONF_DIR`, set environment itu sebelum
+menyalakan backend. Jalur HDFS historis terpisah dari endpoint lokal yang sudah
+ada; NiFi mengirim file, sedangkan endpoint baru menjalankan pembacaan dan batch.
+Pastikan dependensi Spark terpasang (`pip install -r requirements-spark.txt`) dan
+konfigurasi NiFi menulis header OHLCV serta tidak mencampur simbol ke direktori
+aset yang berbeda.
+
 ### Opsi 1: Menjalankan Semua Layanan dalam 1 Perintah (Otomatis)
 Dari direktori root `E:\GIT\Project-Akhir-BigData`, cukup jalankan satu perintah berikut di PowerShell atau Command Prompt:
 ```powershell

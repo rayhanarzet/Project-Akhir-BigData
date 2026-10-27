@@ -3,6 +3,7 @@ import {
   Activity,
   Cpu,
   Database,
+  HardDrive,
   Layers,
   Menu,
   Radio,
@@ -21,6 +22,7 @@ import {
 import { Tab1Ingestion } from './components/Tab1Ingestion';
 import { Tab2AnalyticsBI } from './components/Tab2AnalyticsBI';
 import { Tab3ModelLabShield } from './components/Tab3ModelLabShield';
+import { Tab4HistoricalHdfs } from './components/Tab4HistoricalHdfs';
 
 type SidebarTheme = 'blue' | 'green' | 'primary';
 
@@ -31,7 +33,7 @@ const SIDEBAR_GRADIENTS: Record<SidebarTheme, string> = {
 };
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'tab2' | 'tab3' | 'tab1'>('tab2');
+  const [activeTab, setActiveTab] = useState<'tab2' | 'tab3' | 'tab1' | 'tab4'>('tab2');
   const [sidebarTheme, setSidebarTheme] = useState<SidebarTheme>('blue');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [baseline, setBaseline] = useState<HistoricalBaselineResponse>(
@@ -83,7 +85,7 @@ export const App: React.FC = () => {
   };
 
   const navItems: {
-    id: 'tab2' | 'tab3' | 'tab1';
+    id: 'tab2' | 'tab3' | 'tab1' | 'tab4';
     label: string;
     subtitle: string;
     icon: React.ReactNode;
@@ -105,6 +107,12 @@ export const App: React.FC = () => {
       label: 'Data Ingestion',
       subtitle: 'HDFS, NiFi & Cron Sync',
       icon: <Database className="w-4 h-4" />,
+    },
+    {
+      id: 'tab4',
+      label: 'Historical HDFS Batch',
+      subtitle: 'NiFi, Spark & Historical ML',
+      icon: <HardDrive className="w-4 h-4" />,
     },
   ];
 
@@ -289,6 +297,7 @@ export const App: React.FC = () => {
           {activeTab === 'tab3' && (
             <Tab3ModelLabShield config={config} onChangeConfig={updateConfig} />
           )}
+          {activeTab === 'tab4' && <Tab4HistoricalHdfs />}
         </main>
 
         {/* Black Dashboard Footer */}

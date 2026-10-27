@@ -1,0 +1,103 @@
+"""Dedicated API routes for historical CSV data delivered to HDFS by NiFi."""
+
+from typing import Literal, Optional
+from threading import Lock
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from backend.config import (
+    DEFAULT_FEATURES,
+    HISTORICAL_LOCAL_OUTPUT_PATH,
+    HISTORICAL_OUTPUT_MODE,
+    HISTORICAL_HDFS_OUTPUT_PATH,
+    HISTORICAL_HDFS_RAW_PATH,
+    HISTORICAL_HDFS_URI,
+)
+router = APIRouter(prefix="/api/historical-hdfs", tags=["Historical HDFS Batch"])
+# SparkSession.getOrCreate() shares a SparkContext within this backend process.
+# Serialize historical runs so one request cannot stop another request's context.
+_historical_spark_lock = Lock()
+
+
+class HistoricalHdfsRunRequest(BaseModel):
+    symbol: str = "BTCUSDT"
+    timeframe: Literal["5m", "15m", "1h", "4h", "1d", "1w"] = "1h"
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    features: list[str] = Field(default_factory=lambda: list(DEFAULT_FEATURES))
+    cluster_k: int = Field(default=3, ge=3, le=6)
+    train_ratio: float = Field(default=0.8, ge=0.5, le=0.95)
+    rf_num_trees: int = Field(default=100, ge=20, le=500)
+    rf_max_depth: int = Field(default=10, ge=3, le=30)
+
+
+@router.get("/config")
+def get_historical_hdfs_config():
+    """Show the default HDFS input convention for the NiFi historical flow."""
+    return {
+        "hdfs_uri": HISTORICAL_HDFS_URI,
+        "raw_root": HISTORICAL_HDFS_RAW_PATH,
+        "output_mode": HISTORICAL_OUTPUT_MODE,
+        "output_root": (
+            HISTORICAL_HDFS_OUTPUT_PATH
+            if HISTORICAL_OUTPUT_MODE == "hdfs"
+            else str(HISTORICAL_LOCAL_OUTPUT_PATH)
+        ),
+        "default_input_pattern": f"{HISTORICAL_HDFS_URI}{HISTORICAL_HDFS_RAW_PATH}",
+        "expected_format": "CSV with OHLCV header row and 5m candles",
+        "default_features": DEFAULT_FEATURES,
+        "max_history_days": 365,
+    }
+
+
+@router.post("/run")
+def run_historical_hdfs(req: HistoricalHdfsRunRequest):
+    """Read NiFi-delivered CSV from HDFS, process it, train Spark ML, and persist outputs."""
+    try:
+        from spark_jobs.historical_hdfs_job import run_historical_hdfs_job
+
+        with _historical_spark_lock:
+            return run_historical_hdfs_job(
+                symbol=req.symbol,
+                timeframe=req.timeframe,
+                start_date=req.start_date,
+                end_date=req.end_date,
+                feature_cols=req.features,
+                cluster_k=req.cluster_k,
+                train_ratio=req.train_ratio,
+                rf_num_trees=req.rf_num_trees,
+                rf_max_depth=req.rf_max_depth,
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        error_text = str(exc)
+        if "10061" in error_text or "actively refused" in error_text.lower():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "NameNode menolak koneksi. Backend mencoba menghubungi "
+                    f"'{HISTORICAL_HDFS_URI}', tetapi tidak ada layanan RPC yang menerima koneksi "
+                    "di alamat tersebut. Jalankan NameNode atau atur "
+                    "ARKADANTA_HISTORICAL_HDFS_URI ke host:port RPC NameNode yang dapat dijangkau "
+                    "backend, lalu mulai ulang backend. Path NiFi belum diperiksa karena koneksi "
+                    f"belum terbentuk. Detail: {error_text}"
+                ),
+            ) from exc
+        if HISTORICAL_OUTPUT_MODE == "hdfs" and (
+            "AccessControlException" in error_text or "Permission denied" in error_text
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Spark berhasil membaca dan mengolah input, tetapi tidak memiliki izin tulis "
+                    f"ke output HDFS '{HISTORICAL_HDFS_OUTPUT_PATH}'. Gunakan direktori yang "
+                    "dapat ditulis oleh user Hadoop yang menjalankan FastAPI, atau minta admin "
+                    "HDFS memberi izin pada direktori output tersebut."
+                ),
+            ) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Pipeline historis HDFS gagal. Periksa koneksi NameNode dan path NiFi. Detail: {error_text}",
+        ) from exc

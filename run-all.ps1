@@ -9,11 +9,14 @@ $FrontendDir = Join-Path $ArkadantaDir "frontend"
 
 $VenvRootPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
 $VenvSubPython = Join-Path $ArkadantaDir ".venv\Scripts\python.exe"
+$VenvWindowsPython = Join-Path $ArkadantaDir ".venv-windows\Scripts\python.exe"
 
 if (Test-Path $VenvRootPython) {
     $PythonExe = $VenvRootPython
 } elseif (Test-Path $VenvSubPython) {
     $PythonExe = $VenvSubPython
+} elseif (Test-Path $VenvWindowsPython) {
+    $PythonExe = $VenvWindowsPython
 } else {
     $PythonExe = "python"
 }
