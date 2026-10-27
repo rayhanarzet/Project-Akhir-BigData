@@ -4,10 +4,13 @@ from typing import Literal, Optional
 from threading import Lock
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from backend.schemas import DynamicConfig
 
 from backend.config import (
     DEFAULT_FEATURES,
+    HDFS_BASE_PATH,
     HISTORICAL_LOCAL_OUTPUT_PATH,
     HISTORICAL_OUTPUT_MODE,
     HISTORICAL_HDFS_OUTPUT_PATH,
@@ -21,15 +24,19 @@ _historical_spark_lock = Lock()
 
 
 class HistoricalHdfsRunRequest(BaseModel):
-    symbol: str = "BTCUSDT"
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str = Field(default="BTCUSDT", pattern=r"^[A-Za-z0-9]{2,30}$")
     timeframe: Literal["5m", "15m", "1h", "4h", "1d", "1w"] = "1h"
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     features: list[str] = Field(default_factory=lambda: list(DEFAULT_FEATURES))
-    cluster_k: int = Field(default=3, ge=3, le=6)
+    gmm_components: int = Field(default=3, ge=3, le=6)
     train_ratio: float = Field(default=0.8, ge=0.5, le=0.95)
-    rf_num_trees: int = Field(default=100, ge=20, le=500)
-    rf_max_depth: int = Field(default=10, ge=3, le=30)
+    gb_max_iter: int = Field(default=200, ge=20, le=500)
+    gb_max_depth: int = Field(default=10, ge=3, le=30)
+    # raw: dump historis Binance yang dimasukkan NiFi; clean: data aplikasi dari NiFi outbox (berpartisi).
+    source: Literal["raw", "clean"] = "raw"
 
 
 @router.get("/config")
@@ -45,6 +52,7 @@ def get_historical_hdfs_config():
             else str(HISTORICAL_LOCAL_OUTPUT_PATH)
         ),
         "default_input_pattern": f"{HISTORICAL_HDFS_URI}{HISTORICAL_HDFS_RAW_PATH}",
+        "clean_input_pattern": f"{HISTORICAL_HDFS_URI}{HDFS_BASE_PATH}symbol=<SYMBOL>/year=<YYYY>/month=<MM>/",
         "expected_format": "CSV with OHLCV header row and 5m candles",
         "default_features": DEFAULT_FEATURES,
         "max_history_days": 365,
@@ -54,21 +62,14 @@ def get_historical_hdfs_config():
 @router.post("/run")
 def run_historical_hdfs(req: HistoricalHdfsRunRequest):
     """Read NiFi-delivered CSV from HDFS, process it, train Spark ML, and persist outputs."""
+    if not _historical_spark_lock.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Pipeline historis lain sedang berjalan. Coba lagi setelah selesai.")
     try:
         from spark_jobs.historical_hdfs_job import run_historical_hdfs_job
 
-        with _historical_spark_lock:
-            return run_historical_hdfs_job(
-                symbol=req.symbol,
-                timeframe=req.timeframe,
-                start_date=req.start_date,
-                end_date=req.end_date,
-                feature_cols=req.features,
-                cluster_k=req.cluster_k,
-                train_ratio=req.train_ratio,
-                rf_num_trees=req.rf_num_trees,
-                rf_max_depth=req.rf_max_depth,
-            )
+        params = req.model_dump(exclude={"source"})
+        input_path = f"{HDFS_BASE_PATH.rstrip('/')}/symbol={req.symbol.upper()}" if req.source == "clean" else None
+        return run_historical_hdfs_job(DynamicConfig(**params), input_path=input_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -101,3 +102,5 @@ def run_historical_hdfs(req: HistoricalHdfsRunRequest):
             status_code=503,
             detail=f"Pipeline historis HDFS gagal. Periksa koneksi NameNode dan path NiFi. Detail: {error_text}",
         ) from exc
+    finally:
+        _historical_spark_lock.release()

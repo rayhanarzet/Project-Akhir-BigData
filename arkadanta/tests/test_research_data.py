@@ -29,7 +29,7 @@ class ResearchDataTests(unittest.TestCase):
         for module in (storage, scheduler, ingestion_routes, dynamic_pipeline):
             self.stack.enter_context(patch.object(module, "DROP_ZONE_DIR", self.drop_zone))
         self.stack.enter_context(patch.object(storage, "AUDIT_LOG_PATH", self.directory / "audit.json"))
-        self.stack.enter_context(patch.object(dynamic_pipeline, "_try_sync_to_hdfs", return_value="QUEUED_DROP_ZONE"))
+        self.stack.enter_context(patch.object(storage, "NIFI_OUTBOX_DIR", self.directory / "nifi_outbox"))
         self.worker = scheduler.BinanceCronScheduler()
         self.stack.enter_context(patch.object(ingestion_routes, "cron_scheduler", self.worker))
 
@@ -108,6 +108,23 @@ class ResearchDataTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.worker.trigger_sync(["BTCUSDT"])
         self.assertEqual(list(self.drop_zone.iterdir()), [])
+
+    def test_backfill_pages_with_start_time_until_short_page(self):
+        def kline(open_ms):
+            return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + 299_999, "15", 3, "4", "6", "0"]
+
+        start = 1_700_000_000_000
+        full = Mock()
+        full.json.return_value = [kline(start + i * 300_000) for i in range(1000)]
+        short = Mock()
+        short.json.return_value = [kline(start + (1000 + i) * 300_000) for i in range(5)]
+        with patch.object(scheduler.requests, "get", side_effect=[full, short]) as get, \
+                patch.object(scheduler.time, "sleep"):
+            reports = self.worker.backfill(["BTCUSDT"], days=30)
+        second_start = get.call_args_list[1].kwargs["params"]["startTime"]
+        self.assertEqual(second_start, start + 1000 * 300_000)
+        self.assertEqual(len(storage.load_clean_ohlcv("BTCUSDT")), 1005)
+        self.assertEqual(reports[0]["rows_after"], 1005)
 
     def test_data_error_is_returned_as_actionable_json(self):
         response = asyncio.run(research_data_error_handler(None, storage.ResearchDataError("Data belum tersedia")))

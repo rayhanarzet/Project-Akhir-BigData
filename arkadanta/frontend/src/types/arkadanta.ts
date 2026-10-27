@@ -82,7 +82,7 @@ export interface CandlePoint {
   upper_wick_ratio: number;
   lower_wick_ratio: number;
   body_ratio: number;
-  buy_sell_pressure_ratio: number;
+  buy_sell_pressure_ratio: number | null;
   volume_zscore: number;
   is_anomaly: boolean;
   anomaly_score: number;
@@ -112,7 +112,8 @@ export interface AnalyticsRunResponse {
     anomaly_rate_pct: number;
     threshold_info: {
       method: string;
-      per_symbol_threshold: Record<string, number>;
+      per_symbol_threshold: Record<string, number | null>;
+      causal: boolean;
     };
   };
   historical_factor_attribution?: HistoricalFactorAttribution[];
@@ -198,19 +199,20 @@ export interface HistoricalHdfsRunRequest {
   start_date?: string;
   end_date?: string;
   features: string[];
-  cluster_k: number;
+  gmm_components: number;
   train_ratio: number;
-  rf_num_trees: number;
-  rf_max_depth: number;
+  gb_max_iter: number;
+  gb_max_depth: number;
+  source: 'raw' | 'clean';
 }
 
-export interface HistoricalHdfsRunResponse {
+export interface HistoricalHdfsRunResponse extends ModelMetricsResponse {
   run_id: string;
   data_source: string;
   output_storage: string;
   input_path: string;
   curated_path: string;
-  model_path: string | null;
+  model_path: string;
   metrics_path: string;
   output_format: string;
   model_persisted: boolean;
@@ -222,13 +224,6 @@ export interface HistoricalHdfsRunResponse {
   data_end: string;
   requested_start: string;
   requested_end: string;
-  silhouette_score: number;
-  accuracy: number;
-  f1_score: number;
-  rmse: number;
-  mae: number;
-  cluster_rank_map: Record<string, number>;
-  features: string[];
 }
 
 export interface PredictionResponse {

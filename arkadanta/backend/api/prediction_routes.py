@@ -26,6 +26,7 @@ def live_monitor_endpoint(
     df_5m = load_clean_ohlcv(sym)
     df_feat_5m = compute_dynamic_features(df_5m.tail(120))
     df_feat_5m["timestamp"] = df_feat_5m["timestamp"].astype(str)
+    df_feat_5m = df_feat_5m.astype(object).where(df_feat_5m.notna(), None)
 
     prediction = predict_next_period(
         PredictRequest(symbol=sym, timeframe=timeframe, target_horizon=1)

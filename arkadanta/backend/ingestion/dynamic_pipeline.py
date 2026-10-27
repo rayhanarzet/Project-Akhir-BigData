@@ -1,9 +1,6 @@
 """[ORANG 1 - KONTRAK & STUB] Dynamic Pipeline Controller berbasis aturan (Bab 4.2 & 4.3)."""
 
 from datetime import datetime, timezone
-import os
-import shutil
-import subprocess
 from typing import Dict, Optional, Tuple
 import uuid
 import pandas as pd
@@ -15,18 +12,6 @@ from backend.ingestion.processors.json_processor import parse_json_bytes
 from backend.ingestion.schema_validator import map_and_validate_schema
 from backend.schemas import IngestionAuditReport
 from data.storage import append_audit_logs, save_clean_ohlcv
-
-
-def _try_sync_to_hdfs(local_path: str, hdfs_dir: str) -> str:
-    """Mencoba mengunggah file bersih ke HDFS jika binary hdfs tersedia dan diaktifkan."""
-    if os.getenv("ARKADANTA_ENABLE_HDFS", "0") != "1" or not shutil.which("hdfs"):
-        return "QUEUED_DROP_ZONE"
-    try:
-        subprocess.run(["hdfs", "dfs", "-mkdir", "-p", hdfs_dir], check=True, timeout=10)
-        subprocess.run(["hdfs", "dfs", "-put", "-f", local_path, hdfs_dir], check=True, timeout=15)
-        return "SYNCED"
-    except Exception:
-        return "LOCAL_FALLBACK"
 
 
 def run_dynamic_ingestion_pipeline(
@@ -103,20 +88,12 @@ def run_dynamic_ingestion_pipeline(
     rejected_rows = int(invalid_mask.sum()) + invalid_ts
     df_clean = df[~invalid_mask].reset_index(drop=True)
 
-    # Kolom opsional mikrostruktur
-    if "quote_asset_volume" not in df_clean.columns:
-        df_clean["quote_asset_volume"] = df_clean["volume"] * df_clean["close"]
-    if "number_of_trades" not in df_clean.columns:
-        df_clean["number_of_trades"] = (df_clean["volume"] * 15).astype(int)
-    if "taker_buy_base_volume" not in df_clean.columns:
-        df_clean["taker_buy_base_volume"] = df_clean["volume"] * 0.5
-    if "taker_buy_quote_volume" not in df_clean.columns:
-        df_clean["taker_buy_quote_volume"] = df_clean["quote_asset_volume"] * 0.5
-
+    # Kolom mikrostruktur opsional tidak diisi tebakan; fitur turunannya ditolak bila sumbernya tidak ada.
     symbols_detected = sorted(df_clean["coin_symbol"].unique().tolist())
     primary_sym = symbols_detected[0] if symbols_detected else default_symbol.upper()
 
     # 6. Simpan/gabungkan secara terpisah per coin_symbol ke Drop Zone (mendukung file multi-aset)
+    # Baris baru ikut ditulis ke NiFi outbox oleh save_clean_ohlcv; NiFi yang mengirim ke HDFS.
     saved_paths = []
     hdfs_status = "QUEUED_DROP_ZONE"
     for sym, sym_df in df_clean.groupby("coin_symbol"):
@@ -124,7 +101,6 @@ def run_dynamic_ingestion_pipeline(
         sym_clean = sym_df.sort_values("timestamp").reset_index(drop=True)
         save_clean_ohlcv(sym, sym_clean, merge=False)
         saved_paths.append(f"data/research/drop_zone/{sym_path.name}")
-        hdfs_status = _try_sync_to_hdfs(str(sym_path), f"{HDFS_BASE_PATH}symbol={sym}/")
 
     if not saved_paths:
         out_path = DROP_ZONE_DIR / f"{primary_sym}_5m_clean.csv"

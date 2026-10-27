@@ -21,6 +21,8 @@ from backend.config import (
 from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
 from spark_jobs.feature_pipeline import spark_compute_features
 from spark_jobs.train_models import spark_train_and_evaluate
+from backend.ml.model_trainer import bundle_path
+from backend.schemas import DynamicConfig
 
 
 ALIASES = {
@@ -168,22 +170,10 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
     return cleaned, before_dedup
 
 
-def run_historical_hdfs_job(
-    symbol: str = "BTCUSDT",
-    timeframe: str = "1h",
-    input_path: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    feature_cols: list[str] | None = None,
-    cluster_k: int = 3,
-    train_ratio: float = 0.8,
-    rf_num_trees: int = 100,
-    rf_max_depth: int = 10,
-    ma_period: int = 20,
-    rsi_period: int = 14,
-    rolling_window: int = 20,
-) -> dict:
-    symbol = symbol.upper()
+def run_historical_hdfs_job(config: DynamicConfig, input_path: str | None = None) -> dict:
+    """Batch layer: HDFS -> Spark fitur -> GMM/HGB yang sama dengan Model Lab, lalu dipakai serving layer."""
+    symbol, timeframe = config.symbol.upper(), config.timeframe
+    start_date, end_date = config.start_date, config.end_date
     now = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
     default_start = (now.replace(tzinfo=timezone.utc) - timedelta(days=365)).replace(tzinfo=None)
     start = datetime.fromisoformat(start_date).replace(tzinfo=None) if start_date else default_start
@@ -223,7 +213,6 @@ def run_historical_hdfs_job(
         )
         local_output_root = None
         curated_path = f"{output_root}/curated"
-        model_path = f"{output_root}/model"
         metrics_path = f"{output_root}/metrics"
     elif HISTORICAL_OUTPUT_MODE == "local":
         local_output_root = (
@@ -234,7 +223,6 @@ def run_historical_hdfs_job(
         ).resolve()
         output_root = str(local_output_root)
         curated_path = str(local_output_root / "curated_features.csv")
-        model_path = None
         metrics_path = str(local_output_root / "metrics.json")
     else:
         raise ValueError(
@@ -257,14 +245,17 @@ def run_historical_hdfs_job(
             raise ValueError(
                 f"Hanya {raw_count} baris valid dalam rentang waktu; minimal 30 diperlukan untuk pelatihan."
             )
-        bounds = raw.agg(F.min("timestamp").alias("start"), F.max("timestamp").alias("end")).first()
+        # Format di Spark (session UTC); collect() datetime akan dikonversi ke zona waktu lokal Python.
+        fmt = "yyyy-MM-dd HH:mm:ss"
+        bounds = raw.agg(F.date_format(F.min("timestamp"), fmt).alias("start"),
+                         F.date_format(F.max("timestamp"), fmt).alias("end")).first()
 
         aggregated = spark_aggregate_timeframe(raw, timeframe=timeframe)
         features = spark_compute_features(
             aggregated,
-            ma_period=ma_period,
-            rsi_period=rsi_period,
-            rolling_window=rolling_window,
+            ma_period=config.ma_period,
+            rsi_period=config.rsi_period,
+            rolling_window=config.rolling_window,
         ).cache()
         feature_count = features.count()
         if feature_count < 30:
@@ -272,7 +263,7 @@ def run_historical_hdfs_job(
                 f"Hanya {feature_count} candle hasil agregasi; timeframe {timeframe} "
                 "memerlukan minimal 30 candle untuk pelatihan."
             )
-        selected_features = feature_cols or DEFAULT_FEATURES
+        selected_features = config.features or DEFAULT_FEATURES
         missing_features = [col for col in selected_features if col not in features.columns]
         if missing_features:
             raise ValueError(f"Fitur tidak tersedia dari pipeline PySpark: {missing_features}")
@@ -283,15 +274,11 @@ def run_historical_hdfs_job(
             # read by Spark, while these bounded (<=365d) results are collected
             # and written as CSV/JSON by the driver.
             local_output_root.mkdir(parents=True, exist_ok=False)
+        # Bundle disimpan di MODELS_DIR yang sama sehingga /api/ml/predict memakai model batch ini.
         metrics = spark_train_and_evaluate(
-            features,
-            feature_cols=selected_features,
-            cluster_k=cluster_k,
-            train_ratio=train_ratio,
-            rf_num_trees=rf_num_trees,
-            rf_max_depth=rf_max_depth,
-            model_output_path=model_path,
+            features, config.model_copy(update={"features": selected_features, "start_date": None, "end_date": None})
         )
+        model_path = str(bundle_path(symbol, timeframe))
         metrics.update(
             {
                 "run_id": run_id,
@@ -301,8 +288,8 @@ def run_historical_hdfs_job(
                 "curated_path": curated_path,
                 "model_path": model_path,
                 "metrics_path": metrics_path,
-                "output_format": "CSV + JSON" if local_output_root is not None else "Parquet + Spark MLlib",
-                "model_persisted": model_path is not None,
+                "output_format": "CSV + JSON" if local_output_root is not None else "Parquet + JSON",
+                "model_persisted": True,
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "raw_valid_rows": raw_count,

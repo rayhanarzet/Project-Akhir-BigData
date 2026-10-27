@@ -10,8 +10,10 @@ DROP_ZONE_DIR = DATA_DIR / "drop_zone"
 PROCESSED_DIR = DATA_DIR / "processed"
 MODELS_DIR = DATA_DIR / "models"
 AUDIT_LOG_PATH = DATA_DIR / "audit_logs.json"
+# Antrean NiFi GetFile (Keep Source File=false). Terpisah dari drop_zone agar dataset aktif tidak dipindahkan NiFi.
+NIFI_OUTBOX_DIR = Path(os.getenv("ARKADANTA_NIFI_OUTBOX", str(DATA_DIR / "nifi_outbox")))
 
-for directory in (DATA_DIR, DROP_ZONE_DIR, PROCESSED_DIR, MODELS_DIR):
+for directory in (DATA_DIR, DROP_ZONE_DIR, PROCESSED_DIR, MODELS_DIR, NIFI_OUTBOX_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT"]
@@ -73,3 +75,7 @@ HISTORICAL_OUTPUT_MODE = os.getenv(
 ).strip().lower()
 HISTORICAL_LOCAL_OUTPUT_PATH = PROCESSED_DIR / "historical_hdfs"
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+CORS_ORIGINS = os.getenv(
+    "ARKADANTA_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024

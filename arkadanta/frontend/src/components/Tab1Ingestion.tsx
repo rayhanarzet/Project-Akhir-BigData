@@ -17,6 +17,7 @@ import {
   IngestionAuditReport,
 } from '../types/arkadanta';
 import {
+  backfillBinanceHistory,
   fetchCronStatus,
   SUPPORTED_SYMBOLS,
   triggerBinanceLiveSync,
@@ -45,6 +46,7 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
   const [uploading, setUploading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncLimit, setSyncLimit] = useState<number>(300);
+  const [backfillDays, setBackfillDays] = useState<number>(365);
   const [selectedSyncSymbols, setSelectedSyncSymbols] = useState<string[]>(SUPPORTED_SYMBOLS);
   const [latestReport, setLatestReport] = useState<IngestionAuditReport | null>(
     baseline.audit_logs[0] || null
@@ -172,6 +174,22 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
       setStatusMessage(err instanceof Error ? err.message : 'Sinkronisasi Binance gagal.');
       onRefreshBaseline();
     } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleBackfill = async () => {
+    if (selectedSyncSymbols.length === 0) return;
+    setSyncing(true);
+    setStatusMessage(null);
+    try {
+      const res = await backfillBinanceHistory(selectedSyncSymbols, backfillDays);
+      if (res.reports.length > 0) setLatestReport(res.reports[res.reports.length - 1]);
+      setStatusMessage(`Backfill ${backfillDays} hari selesai untuk ${res.synced_assets} aset.`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Backfill Binance gagal.');
+    } finally {
+      onRefreshBaseline();
       setSyncing(false);
     }
   };
@@ -491,6 +509,29 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                   {syncing ? 'Synchronizing...' : 'Manual Sync Now'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#9a9a9a]">Backfill (hari):</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={backfillDays}
+                    onChange={(e) => setBackfillDays(Math.min(365, Math.max(1, Number(e.target.value) || 365)))}
+                    className="bd-input !w-24 !py-1.5 font-mono"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBackfill}
+                  disabled={syncing || selectedSyncSymbols.length === 0}
+                  className="bd-btn-teal flex items-center gap-2 disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Menarik histori...' : 'Backfill Histori'}
                 </button>
               </div>
             </div>

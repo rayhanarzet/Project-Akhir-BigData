@@ -36,6 +36,7 @@ class ModelMigrationTests(unittest.TestCase):
         self.drop = self.root / 'drop'
         self.drop.mkdir()
         self.stack.enter_context(patch.object(storage, 'DROP_ZONE_DIR', self.drop))
+        self.stack.enter_context(patch.object(storage, 'NIFI_OUTBOX_DIR', self.root / 'nifi_outbox'))
         self.stack.enter_context(patch.object(model_trainer, 'MODELS_DIR', self.models))
         self.raw = generate_synthetic_5m_ohlcv(n_candles=600)
         self.raw.to_csv(self.drop / 'BTCUSDT_5m_clean.csv', index=False)
@@ -90,7 +91,9 @@ class ModelMigrationTests(unittest.TestCase):
         np.testing.assert_allclose(old['labeler'].scaler.mean_, new['labeler'].scaler.mean_)
         probe = features[baseline['features']].iloc[:10].to_numpy()
         with threadpool_limits(limits=2):
-            np.testing.assert_allclose(old['classifier'].predict_proba(probe), new['classifier'].predict_proba(probe))
+            # Model yang dievaluasi tidak boleh melihat holdout; model deploy memang dilatih ulang pada semua data.
+            np.testing.assert_allclose(old['holdout_classifier'].predict_proba(probe), new['holdout_classifier'].predict_proba(probe))
+        self.assertEqual(baseline['classification_metrics'].keys(), current['classification_metrics'].keys())
         self.assertEqual(current['temporal_split']['embargo_samples'], 3)
         with self.assertRaisesRegex(storage.ResearchDataError, 'horizon'):
             model_predictor.predict_next_period(PredictRequest(timeframe='5m', target_horizon=1))

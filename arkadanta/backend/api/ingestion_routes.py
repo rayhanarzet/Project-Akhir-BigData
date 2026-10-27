@@ -1,5 +1,6 @@
 """Endpoint Ingestion & Historical Baseline (Kontrak Orang 1 <-> Orang 2)."""
 
+import asyncio
 from datetime import datetime, timezone
 import json
 from typing import Optional
@@ -13,9 +14,11 @@ from backend.config import (
     DEFAULT_SYMBOLS,
     DROP_ZONE_DIR,
     HDFS_BASE_PATH,
+    MAX_UPLOAD_BYTES,
 )
 from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
 from backend.schemas import (
+    BackfillRequest,
     CronConfigRequest,
     CronStatusResponse,
     IngestionAuditReport,
@@ -38,10 +41,14 @@ async def upload_dataset(
     column_mapping_json: Optional[str] = Form(None),
 ):
     """Menerima unggahan CSV/JSON, menjalankan Dynamic Pipeline Controller, dan mengembalikan laporan audit."""
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"Berkas melebihi {MAX_UPLOAD_BYTES // (1024 * 1024)} MB. Kirim data besar lewat NiFi ke HDFS.")
     try:
-        content = await file.read()
         custom_map = json.loads(column_mapping_json) if column_mapping_json else None
-        _, report = run_dynamic_ingestion_pipeline(
+        # Parsing CPU-bound di thread agar stream live (event loop) tidak tertahan.
+        _, report = await asyncio.to_thread(
+            run_dynamic_ingestion_pipeline,
             filename=file.filename or "uploaded_data.csv",
             content=content,
             custom_mapping=custom_map,
@@ -77,6 +84,16 @@ def sync_live_binance(req: LiveSyncRequest):
     except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
         raise HTTPException(status_code=502, detail=f"Sinkronisasi Binance gagal: {exc}. Data simulasi tidak digunakan.") from exc
     return {"status": "ok", "synced_assets": len(synced_reports), "reports": synced_reports}
+
+
+@router.post("/api/ingestion/backfill")
+def backfill_binance_history(req: BackfillRequest):
+    """Menarik histori 5m Binance hingga 365 hari; baris baru ikut masuk NiFi outbox untuk HDFS."""
+    try:
+        reports = cron_scheduler.backfill(req.symbols, req.days)
+    except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail=f"Backfill Binance gagal: {exc}. Aset yang sudah selesai tetap tersimpan.") from exc
+    return {"status": "ok", "synced_assets": len(reports), "reports": reports}
 
 
 @router.get("/api/historical-baseline")

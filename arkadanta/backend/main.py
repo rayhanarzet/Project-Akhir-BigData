@@ -21,7 +21,7 @@ from backend.api.model_routes import router as model_router
 from backend.api.prediction_routes import router as prediction_router
 from backend.api.market_routes import router as market_router
 from backend.market_stream import market_stream
-from backend.config import AVAILABLE_FEATURES, DEFAULT_SYMBOLS, SUPPORTED_TIMEFRAMES
+from backend.config import AVAILABLE_FEATURES, CORS_ORIGINS, DEFAULT_SYMBOLS, SUPPORTED_TIMEFRAMES
 
 @asynccontextmanager
 async def lifespan(app):
@@ -36,12 +36,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Dashboard memakai proxy Vite (same-origin); CORS hanya untuk origin dashboard lokal.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 

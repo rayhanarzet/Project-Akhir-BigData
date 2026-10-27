@@ -12,12 +12,17 @@ def select_and_prepare_features(
 ) -> Tuple[pd.DataFrame, List[str]]:
     """Memvalidasi daftar fitur pilihan pengguna dan menyiapkan matriks fitur bersih tanpa nilai NaN/Inf."""
     candidates = requested_features or DEFAULT_FEATURES
-    valid_cols = [c for c in candidates if c in df.columns]
-
-    if not valid_cols:
-        valid_cols = [c for c in DEFAULT_FEATURES if c in df.columns]
-    if not valid_cols:
-        valid_cols = [c for c in AVAILABLE_FEATURES if c in df.columns][:4]
+    unknown = [c for c in candidates if c not in AVAILABLE_FEATURES]
+    if unknown:
+        raise ValueError(f"Fitur tidak dikenal: {unknown}")
+    # Jangan diam-diam mengganti fitur pilihan pengguna atau mengisi kolom sumber yang tidak ada dengan nol.
+    unavailable = [c for c in candidates if c not in df.columns or df[c].isna().any()]
+    if unavailable:
+        raise ValueError(
+            f"Fitur {unavailable} tidak tersedia lengkap dari data sumber "
+            "(mis. CSV tanpa kolom taker/quote/trades). Hapus fitur tersebut atau gunakan data Binance lengkap."
+        )
+    valid_cols = list(candidates)
 
     clean_df = df.copy()
     for col in valid_cols:

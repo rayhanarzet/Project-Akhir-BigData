@@ -61,6 +61,11 @@ export function triggerBinanceLiveSync(symbols: string[], limit: number): Promis
   return request('/api/ingestion/live-sync', post({ symbols, interval: '5m', limit }), Math.max(15000, symbols.length * 10000));
 }
 
+export function backfillBinanceHistory(symbols: string[], days: number): Promise<{ synced_assets: number; reports: IngestionAuditReport[] }> {
+  // ~105 permintaan Binance per aset per tahun.
+  return request('/api/ingestion/backfill', post({ symbols, days }), symbols.length * 5 * 60 * 1000);
+}
+
 export function fetchCronStatus(): Promise<CronStatus> {
   return request('/api/ingestion/cron-status');
 }

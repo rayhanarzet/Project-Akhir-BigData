@@ -117,12 +117,13 @@ wsl -d Ubuntu-24.04
 | Candle lima menit selesai → penyimpanan penelitian lokal | Tersedia |
 | Analisis dan ML GMM/HistGradientBoosting | Tersedia; membutuhkan data yang cukup |
 | Pemrosesan fitur dengan Spark | Jalur kode tersedia; Java/PySpark perlu terpasang dan berfungsi |
-| NiFi → HDFS | Perlu flow NiFi dikonfigurasi dan dibuktikan berhasil |
-| Pengiriman setiap candle aplikasi → NiFi secara otomatis | Belum tersedia |
-| Training Spark membaca dataset dari HDFS | Belum tersedia; kode saat ini membaca CSV lokal |
-| Pengambilan histori satu tahun dan retensi otomatis | Belum tersedia |
+| Baris baru aplikasi → NiFi outbox berpartisi symbol/year/month | Tersedia otomatis |
+| NiFi outbox → HDFS | Perlu flow NiFi bagian 12 dikonfigurasi sekali |
+| Training Spark membaca dataset dari HDFS | Tersedia di Tab 4 (sumber Raw atau Clean); bundle dipakai prediksi live |
+| Backfill histori Binance hingga 365 hari | Tersedia lewat `POST /api/ingestion/backfill` |
+| Retensi otomatis di HDFS | Belum tersedia |
 
-**HDFS/NiFi yang menyala belum membuktikan bahwa aplikasi telah mengirim data ke HDFS.** Bagian 12 menjelaskan uji pengiriman terpisah menggunakan salinan data nyata.
+**HDFS/NiFi yang menyala belum membuktikan bahwa data sudah sampai ke HDFS.** Periksa dengan bagian 12.3.
 
 Dashboard/backend dapat dipakai tanpa menyalakan HDFS/NiFi. Untuk demonstrasi seluruh komponen, ikuti urutan HDFS → NiFi → backend → dashboard berikut.
 
@@ -452,72 +453,60 @@ Alternatifnya, pilih pemrosesan fitur Spark di **Model Lab & Shield**, lalu klik
 
 Spark UI biasanya tersedia pada **http://localhost:4040** selama SparkContext masih aktif; port dapat bergeser jika terpakai. Karena job menghentikan Spark setelah selesai, halaman tersebut dapat hilang sesudah job berakhir. Spark tidak perlu dijalankan sebagai daemon terpisah untuk mode `local[*]` ini.
 
-## 12. Membuktikan pengiriman NiFi ke HDFS, opsional
+## 12. Flow NiFi → HDFS (otomatis dari aplikasi)
 
-Bagian ini adalah **uji pengiriman salinan berkas**. Ini belum membuat pipeline live Arkadanta otomatis terintegrasi dengan HDFS, dan belum mengubah sumber training menjadi HDFS.
+Setiap kali backend menyimpan baris baru (upload, sinkronisasi Binance, atau candle live yang selesai), baris **baru saja** juga ditulis ke antrean NiFi:
 
-### 12.1 Siapkan folder antrean demonstrasi
-
-Setelah `BTCUSDT_5m_clean.csv` tersedia, di Ubuntu:
-
-```bash
-mkdir -p /home/anam/arkadanta-nifi-inbox
-cp /mnt/e/GIT/Project-Akhir-BigData/arkadanta/data/research/drop_zone/BTCUSDT_5m_clean.csv "/home/anam/arkadanta-nifi-inbox/BTCUSDT-$(date -u +%Y%m%dT%H%M%SZ).csv"
+```text
+arkadanta/data/research/nifi_outbox/symbol=<SYMBOL>/year=<YYYY>/month=<MM>/<SYMBOL>_5m_<waktu>_<id>.csv
 ```
 
-Folder ini berisi salinan untuk dikirim. **Jangan arahkan GetFile ke folder dataset penelitian aktif**, karena GetFile dapat mengambil dan menghapus berkas sumber. Snapshot demonstrasi tidak boleh digabung berulang kali sebagai dataset training tanpa deduplikasi.
+Berkas ditulis atomik (berkas sementara diawali titik), jadi NiFi tidak mengambil berkas setengah jadi. Dataset aktif di `drop_zone` tidak disentuh NiFi.
 
-Siapkan direktori tujuan HDFS:
+### 12.1 Siapkan direktori HDFS
 
 ```bash
-/home/anam/hadoop/bin/hdfs dfs -mkdir -p /user/arkadanta/data/clean/crypto/manual-demo
+/home/anam/hadoop/bin/hdfs dfs -mkdir -p /user/arkadanta/data/clean/crypto /arkadanta/raw
 ```
 
 ### 12.2 Buat flow NiFi
 
-Di antarmuka NiFi, apabila processor **PutHDFS** tersedia pada versi/extension instalasi Anda:
-
 ```text
-GetFile --success--> PutHDFS
-                       ├── success: selesai
-                       └── failure: antrean percobaan ulang
+GetFile --success--> UpdateAttribute --success--> PutHDFS
+                                                    ├── success: auto-terminate
+                                                    └── failure: kembali ke PutHDFS (retry)
 ```
 
-Konfigurasi GetFile:
+**GetFile**
 
 | Pengaturan | Nilai |
 |---|---|
-| Input Directory | `/home/anam/arkadanta-nifi-inbox` |
-| File Filter | `.*\.csv` |
-| Keep Source File | `false`, hanya karena sumbernya salinan dalam folder antrean khusus |
+| Input Directory | `/mnt/e/GIT/Project-Akhir-BigData/arkadanta/data/research/nifi_outbox` |
+| Recurse Subdirectories | `true` |
+| File Filter | `[^.].*\.csv` |
+| Keep Source File | `false` (aman: outbox hanya berisi salinan) |
 
-Konfigurasi PutHDFS:
+**UpdateAttribute**: menambahkan atribut `hdfs.dir` = `/user/arkadanta/data/clean/crypto/${path}`. Atribut `path` dari GetFile sudah berisi `symbol=.../year=.../month=...`.
+
+**PutHDFS**
 
 | Pengaturan | Nilai |
 |---|---|
 | Hadoop Configuration Resources | `/home/anam/hadoop/etc/hadoop/core-site.xml,/home/anam/hadoop/etc/hadoop/hdfs-site.xml` |
-| Directory | `/user/arkadanta/data/clean/crypto/manual-demo` |
-| Conflict Resolution Strategy | Pilih perilaku gagal jika nama sudah ada, agar tidak menimpa arsip |
+| Directory | `${hdfs.dir}` |
+| Conflict Resolution Strategy | `fail` (nama berkas sudah unik) |
 
-Hubungkan `success` GetFile ke PutHDFS. Pada PutHDFS, selesaikan hubungan `success`; hubungkan `failure` kembali untuk percobaan ulang sesuai opsi yang tersedia, dan pantau antreannya. Jangan otomatis membuang berkas yang gagal. Periksa validasi processor sebelum menjalankannya.
+Jika PutHDFS tidak tersedia pada NiFi 2.x, pasang NAR `nifi-hadoop-nar` yang versinya sama dengan NiFi ke `/opt/nifi/lib`, lalu restart NiFi.
 
-Nama properti dapat sedikit berbeda menurut versi. Jika PutHDFS tidak tersedia, extension Hadoop yang cocok dengan versi NiFi perlu disiapkan terlebih dahulu; jangan menganggap flow sudah bekerja hanya karena NiFi menyala.
-
-### 12.3 Periksa bukti keberhasilan
-
-1. Aktifkan processor dan perhatikan jumlah FlowFile/antrean.
-2. Periksa bulletin error dan Data Provenance.
-3. Pastikan berkas benar-benar masuk ke HDFS:
+### 12.3 Bukti keberhasilan
 
 ```bash
-/home/anam/hadoop/bin/hdfs dfs -ls /user/arkadanta/data/clean/crypto/manual-demo
+/home/anam/hadoop/bin/hdfs dfs -ls -R /user/arkadanta/data/clean/crypto | head
 ```
 
-4. Periksa isi berkas melalui fasilitas Browse filesystem pada antarmuka NameNode.
+Outbox lokal seharusnya kosong setelah NiFi memprosesnya. Di dashboard Tab 4, pilih **Sumber HDFS: Clean**. Spark akan membaca `hdfs://.../user/arkadanta/data/clean/crypto/symbol=<SYMBOL>/`, melatih GMM/HGB, dan menyimpan bundle yang langsung dipakai prediksi live.
 
-Jika izin HDFS ditolak, periksa pengguna proses NiFi dan kepemilikan direktori tujuan. Berikan izin yang diperlukan pada direktori tujuan; jangan membuka seluruh HDFS untuk semua pengguna.
-
-Keberhasilan langkah ini membuktikan **NiFi berhasil mengirim snapshot ke HDFS**. Status aplikasi `QUEUED_DROP_ZONE` tidak otomatis berubah berdasarkan flow manual ini. Integrasi produksi masih memerlukan pembuatan antrean otomatis, konfirmasi pengiriman, pembacaan histori HDFS oleh Spark, dan retensi data.
+Status audit tetap `QUEUED_DROP_ZONE`: aplikasi tidak menerima konfirmasi balik dari NiFi. Bukti pengiriman ada di Data Provenance NiFi dan `hdfs dfs -ls`.
 
 ## 13. Menghentikan layanan
 

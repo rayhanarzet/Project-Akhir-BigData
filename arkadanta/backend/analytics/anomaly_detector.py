@@ -22,7 +22,8 @@ def detect_anomalies(
 
     data = df.copy()
     target_col = "max_volatility" if "max_volatility" in data.columns else "hl_range"
-    threshold_info: Dict[str, Any] = {"method": method, "per_symbol_threshold": {}}
+    # GMM di-fit pada seluruh rentang: analisis rezim retrospektif, bukan alarm real-time.
+    threshold_info: Dict[str, Any] = {"method": method, "per_symbol_threshold": {}, "causal": method != "gmm"}
 
     data["is_anomaly"] = False
     data["anomaly_score"] = 0.0
@@ -32,31 +33,33 @@ def detect_anomalies(
         idx = grp.index
         s = grp[target_col].astype(float)
 
+        # Ambang rolling/IQR/quantile hanya memakai data sampai t-1 (shift) agar label lama
+        # tidak berubah saat data baru masuk. Candle sebelum riwayat cukup tidak dinilai.
         if method == "rolling_zscore":
-            r_mean = s.rolling(window=rolling_window, min_periods=3).mean().fillna(s.mean())
-            r_std = s.rolling(window=rolling_window, min_periods=3).std().replace(0, 1e-8).fillna(s.std() or 1e-8)
-            z_scores = (s - r_mean) / np.maximum(r_std, 1e-8)
+            past = s.shift(1).rolling(window=rolling_window, min_periods=3)
+            r_mean, r_std = past.mean(), past.std().replace(0, 1e-8)
+            z_scores = ((s - r_mean) / np.maximum(r_std, 1e-8)).fillna(0.0)
             is_anom = (z_scores.abs() >= z_threshold) | (grp.get("volume_zscore", 0).abs() >= z_threshold + 0.5)
             data.loc[idx, "anomaly_score"] = z_scores.round(4)
             data.loc[idx, "is_anomaly"] = is_anom
             threshold_info["per_symbol_threshold"][sym] = float(z_threshold)
 
         elif method == "iqr":
-            q1 = float(s.quantile(0.25))
-            q3 = float(s.quantile(0.75))
-            iqr = max(q3 - q1, 1e-8)
+            past = s.shift(1).expanding(min_periods=rolling_window)
+            q1, q3 = past.quantile(0.25), past.quantile(0.75)
+            iqr = np.maximum(q3 - q1, 1e-8)
             upper_bound = q3 + iqr_multiplier * iqr
-            scores = (s - upper_bound) / iqr
-            is_anom = s > upper_bound
+            scores = ((s - upper_bound) / iqr).fillna(0.0)
+            is_anom = (s > upper_bound).fillna(False)
             data.loc[idx, "anomaly_score"] = scores.round(4)
             data.loc[idx, "is_anomaly"] = is_anom
-            threshold_info["per_symbol_threshold"][sym] = round(upper_bound, 6)
+            threshold_info["per_symbol_threshold"][sym] = round(float(upper_bound.iloc[-1]), 6) if upper_bound.notna().any() else None
 
         elif method == "gmm":
             cols = [
                 c
                 for c in (feature_cols or ["max_volatility", "spike_ratio", "volume_zscore"])
-                if c in grp.columns
+                if c in grp.columns and grp[c].notna().all()
             ]
             if not cols:
                 cols = [target_col]
@@ -76,12 +79,12 @@ def detect_anomalies(
             threshold_info["per_symbol_threshold"][sym] = round(dist_thresh, 4)
 
         else:  # adaptive_quantile (default)
-            thresh = float(s.quantile(quantile))
-            scores = s / max(thresh, 1e-8)
-            is_anom = s >= thresh
+            thresh = s.shift(1).expanding(min_periods=rolling_window).quantile(quantile)
+            scores = (s / np.maximum(thresh, 1e-8)).fillna(0.0)
+            is_anom = (s >= thresh).fillna(False)
             data.loc[idx, "anomaly_score"] = scores.round(4)
             data.loc[idx, "is_anomaly"] = is_anom
-            threshold_info["per_symbol_threshold"][sym] = round(thresh, 6)
+            threshold_info["per_symbol_threshold"][sym] = round(float(thresh.iloc[-1]), 6) if thresh.notna().any() else None
 
         anom_idx = idx[data.loc[idx, "is_anomaly"]]
         data.loc[anom_idx, "anomaly_reason"] = (

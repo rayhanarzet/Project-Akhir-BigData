@@ -26,4 +26,5 @@ def isolated_backend_storage(tmp_path, monkeypatch):
             monkeypatch.setattr(module, "MODELS_DIR", models)
         if hasattr(module, "AUDIT_LOG_PATH"):
             monkeypatch.setattr(module, "AUDIT_LOG_PATH", tmp_path / "audit.json")
-    monkeypatch.delenv("ARKADANTA_ENABLE_HDFS", raising=False)
+        if hasattr(module, "NIFI_OUTBOX_DIR"):
+            monkeypatch.setattr(module, "NIFI_OUTBOX_DIR", tmp_path / "nifi_outbox")

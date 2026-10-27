@@ -185,8 +185,10 @@ ID cluster 0, 1, atau 2 tidak langsung menjadi label karena bersifat arbitrer.
 
 ## 5.6 Prediksi T+1 dengan HistGradientBoosting
 
-- `RandomForestClassifier`: fitur waktu T memprediksi probabilitas SAFE, WARNING, dan DANGER pada T+1.
-- `RandomForestRegressor`: fitur waktu T memprediksi `max_volatility` atau target numerik lain pada T+1.
+- `HistGradientBoostingClassifier`: fitur waktu T memprediksi probabilitas SAFE, WARNING, dan DANGER pada T+1.
+- `HistGradientBoostingRegressor`: fitur waktu T memprediksi `max_volatility` pada T+1.
+
+Evaluasi memakai model yang dilatih pada data latih saja (validasi temporal dengan embargo). Setelah evaluasi, model yang dipakai prediksi live dilatih ulang pada seluruh data berlabel dengan definisi label GMM yang sama, sehingga periode terbaru ikut dipelajari. Prediksi live hanya memakai candle timeframe yang sudah tertutup.
 
 Indikator rentang harga:
 

@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.ml.model_predictor import get_latest_metrics
-from backend.ml.model_trainer import train_dynamic_models
+from backend.ml.model_trainer import train_dynamic_models, training_lock
 from backend.schemas import DynamicConfig
 
 router = APIRouter(tags=["Machine Learning & Evaluation (Orang 2)"])
@@ -13,11 +13,16 @@ router = APIRouter(tags=["Machine Learning & Evaluation (Orang 2)"])
 @router.post("/api/ml/train")
 def train_model_endpoint(config: DynamicConfig):
     """Melatih Gaussian Mixture Risk Labeler (SAFE/WARNING/DANGER) dan HistGradientBoosting T+1 dengan validasi temporal."""
+    # Tolak training paralel daripada mengantre; mencegah request berulang menghabiskan CPU.
+    if not training_lock.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Training lain sedang berjalan. Coba lagi setelah selesai.")
     try:
-        metrics = train_dynamic_models(config)
-        return metrics
-    except Exception as exc:
+        return train_dynamic_models(config)
+    except ValueError as exc:
+        # Kesalahan data/konfigurasi; bug internal tetap 500 agar tidak tersamar sebagai input salah.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        training_lock.release()
 
 
 @router.get("/api/models/metrics")

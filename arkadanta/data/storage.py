@@ -6,7 +6,7 @@ import threading
 import uuid
 from typing import List
 import pandas as pd
-from backend.config import AUDIT_LOG_PATH, DROP_ZONE_DIR
+from backend.config import AUDIT_LOG_PATH, DROP_ZONE_DIR, NIFI_OUTBOX_DIR
 
 _write_lock = threading.RLock()
 
@@ -72,13 +72,35 @@ def append_audit_logs(logs: List[dict]) -> None:
 
 def save_clean_ohlcv(symbol: str, frame: pd.DataFrame, *, merge: bool = True) -> tuple[int, int]:
     """Serialisasi penulis upload/REST/stream dalam satu worker; pembaca melihat berkas utuh."""
+    # shortcut: setiap simpan menulis ulang CSV aset (~10 MB/tahun 5m), O(n) per candle; cukup untuk
+    # 4 aset x 1 tahun. Untuk multi-tahun, pindahkan speed layer ke berkas append per bulan/Parquet.
     symbol = _symbol(symbol)
     path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
     with _write_lock:
-        previous = load_clean_ohlcv(symbol) if merge and path.exists() else None
+        existing = load_clean_ohlcv(symbol) if path.exists() else None
+        previous = existing if merge else None
         rows_before = len(frame) + (len(previous) if previous is not None else 0)
         output = pd.concat([previous, frame], ignore_index=True) if previous is not None else frame.copy()
         output["timestamp"] = pd.to_datetime(output["timestamp"], utc=True)
         output = output.sort_values("timestamp").drop_duplicates(["coin_symbol", "timestamp"], keep="last")
         _atomic_write(path, output.to_csv(index=False))
+        known = set(existing["timestamp"]) if existing is not None else set()
+        _write_nifi_outbox(symbol, output[~output["timestamp"].isin(known)])
         return rows_before, len(output)
+
+
+def _write_nifi_outbox(symbol: str, new_rows: pd.DataFrame) -> None:
+    """Snapshot baris baru untuk NiFi GetFile -> PutHDFS dengan partisi symbol/year/month.
+
+    Nama berkas unik dan ditulis atomik (berkas sementara diawali titik diabaikan GetFile),
+    sehingga NiFi boleh memindahkan berkas tanpa menyentuh dataset penelitian aktif.
+    """
+    if new_rows.empty:
+        return
+    stamp = f"{pd.Timestamp.now(tz='UTC'):%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:6]}"
+    # shortcut: satu berkas kecil per penyimpanan (candle live = per 5 menit); untuk volume besar,
+    # gabungkan berkas kecil di HDFS (MergeContent NiFi atau compaction Spark berkala).
+    for (year, month), part in new_rows.groupby([new_rows["timestamp"].dt.year, new_rows["timestamp"].dt.month]):
+        target = NIFI_OUTBOX_DIR / f"symbol={symbol}" / f"year={year}" / f"month={month:02d}"
+        target.mkdir(parents=True, exist_ok=True)
+        _atomic_write(target / f"{symbol}_5m_{stamp}.csv", part.to_csv(index=False))

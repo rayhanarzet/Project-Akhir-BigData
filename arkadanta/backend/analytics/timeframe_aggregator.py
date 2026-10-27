@@ -11,8 +11,17 @@ TIMEFRAME_PANDAS_MAP = {
     "1h": "1h",
     "4h": "4h",
     "1d": "1D",
-    "1w": "1W",
+    # Minggu Senin 00:00 UTC seperti Binance; sama dengan window Spark startTime="4 days".
+    "1w": "W-MON",
 }
+TIMEFRAME_DURATION = {
+    "15m": pd.Timedelta(minutes=15),
+    "1h": pd.Timedelta(hours=1),
+    "4h": pd.Timedelta(hours=4),
+    "1d": pd.Timedelta(days=1),
+    "1w": pd.Timedelta(weeks=1),
+}
+BASE_CANDLE = pd.Timedelta(minutes=5)
 
 
 def aggregate_timeframe(
@@ -68,12 +77,15 @@ def aggregate_timeframe(
             if opt_col in grp.columns:
                 agg_dict[opt_col] = "sum"
 
-        res = grp.resample(freq).agg(agg_dict)
+        res = grp.resample(freq, label="left", closed="left").agg(agg_dict)
         res.columns = [
             f"{c[0]}_{c[1]}" if c[0] == "candle_volatility" else c[0]
             for c in res.columns
         ]
         res = res.dropna(subset=["open", "high", "low", "close"]).reset_index()
+        # Bucket terakhir yang belum tertutup akan bias rendah pada volume/volatilitas; jangan dipakai.
+        data_end = grp.index.max() + BASE_CANDLE
+        res = res[res["timestamp"] + TIMEFRAME_DURATION[timeframe] <= data_end].reset_index(drop=True)
         res["coin_symbol"] = sym
         res["max_volatility"] = np.maximum(
             res["candle_volatility_max"],

@@ -16,6 +16,43 @@ from data.storage import (
 import uuid
 
 
+FIVE_MINUTES_MS = 5 * 60 * 1000
+
+
+def _fetch_closed_klines(symbol: str, limit: int, start_time_ms: Optional[int] = None) -> pd.DataFrame:
+    """Satu permintaan /api/v3/klines 5m; candle yang belum selesai dibuang."""
+    params = {"symbol": symbol, "interval": "5m", "limit": limit}
+    if start_time_ms is not None:
+        params["startTime"] = start_time_ms
+    resp = requests.get(BINANCE_KLINES_URL, params=params, timeout=7)
+    resp.raise_for_status()
+    raw_klines = resp.json()
+    if not isinstance(raw_klines, list):
+        raise ValueError(f"Respons Binance untuk {symbol} tidak valid")
+    if not raw_klines and start_time_ms is None:
+        raise ValueError(f"Binance tidak mengembalikan candle untuk {symbol}")
+    now_ms = int(time.time() * 1000)
+    rows = [
+        {
+            "timestamp": pd.to_datetime(int(k[0]), unit="ms", utc=True),
+            "coin_symbol": symbol,
+            "open": float(k[1]),
+            "high": float(k[2]),
+            "low": float(k[3]),
+            "close": float(k[4]),
+            "volume": float(k[5]),
+            "quote_asset_volume": float(k[7]),
+            "number_of_trades": int(k[8]),
+            "taker_buy_base_volume": float(k[9]),
+            "taker_buy_quote_volume": float(k[10]),
+        }
+        # Candle berjalan hanya ditampilkan live; dataset ML memakai candle selesai.
+        for k in raw_klines
+        if int(k[6]) < now_ms
+    ]
+    return pd.DataFrame(rows)
+
+
 class BinanceCronScheduler:
     """Pengelola background cron scheduler untuk sinkronisasi live data otomatis."""
 
@@ -87,6 +124,46 @@ class BinanceCronScheduler:
         with self._sync_lock:
             return self._trigger_sync(symbols, limit)
 
+    def backfill(self, symbols: List[str], days: int) -> List[Dict[str, Any]]:
+        """Menarik histori 5m hingga `days` hari ke belakang per halaman 1000 candle (startTime)."""
+        with self._sync_lock:
+            reports = []
+            for sym in symbols:
+                symbol = sym.upper()
+                cursor = int((time.time() - days * 86400) * 1000)
+                pages = []
+                while True:
+                    page = _fetch_closed_klines(symbol, 1000, start_time_ms=cursor)
+                    if page.empty:
+                        break
+                    pages.append(page)
+                    cursor = int(page["timestamp"].iloc[-1].value // 1_000_000) + FIVE_MINUTES_MS
+                    if len(page) < 1000:
+                        break
+                    time.sleep(0.2)  # di bawah batas bobot Binance (6000/menit)
+                if not pages:
+                    raise ValueError(f"Binance tidak mengembalikan histori untuk {symbol}")
+                frame = pd.concat(pages, ignore_index=True)
+                rows_before, rows_after = save_clean_ohlcv(symbol, frame)
+                reports.append(IngestionAuditReport(
+                    run_id=f"backfill_{uuid.uuid4().hex[:8]}",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    source_name=f"Binance /api/v3/klines ({symbol} 5m backfill {days} hari)",
+                    format_detected="BINANCE_API",
+                    selected_pipeline="BinanceBackfillPager -> SchemaNormalizer -> Deduplicator -> DropZoneWriter -> NiFiOutbox",
+                    column_mapping={"open_time": "timestamp", "symbol": "coin_symbol"},
+                    symbols_detected=[symbol], rows_before=rows_before, rows_after=rows_after,
+                    duplicates_removed=max(0, rows_before - rows_after),
+                    imputed_ohlc_rows=0, imputed_volume_rows=0, rejected_rows=0,
+                    error_reasons={"high_less_than_low": 0, "non_positive_price": 0, "negative_volume": 0, "invalid_timestamp": 0},
+                    drop_zone_path=f"data/research/drop_zone/{symbol}_5m_clean.csv",
+                    hdfs_target_path=f"{HDFS_BASE_PATH}symbol={symbol}/",
+                    nifi_hdfs_status="QUEUED_DROP_ZONE", quality_score_pct=100.0,
+                ).model_dump())
+                # Simpan audit per aset agar aset yang sudah selesai tetap tercatat bila aset berikutnya gagal.
+                append_audit_logs(reports[-1:])
+            return reports
+
     def _trigger_sync(self, symbols: Optional[List[str]], limit: Optional[int]) -> List[Dict[str, Any]]:
         """Mengeksekusi penarikan data Binance untuk simbol terpilih (dapat dipanggil cron atau manual)."""
         target_symbols = symbols or self.symbols
@@ -97,36 +174,7 @@ class BinanceCronScheduler:
             symbol = sym.upper()
             source_mode = "BINANCE_API"
             try:
-                resp = requests.get(
-                    BINANCE_KLINES_URL,
-                    params={"symbol": symbol, "interval": "5m", "limit": target_limit},
-                    timeout=7,
-                )
-                resp.raise_for_status()
-                raw_klines = resp.json()
-                if not isinstance(raw_klines, list) or not raw_klines:
-                    raise ValueError(f"Binance tidak mengembalikan candle untuk {symbol}")
-                rows = []
-                for k in raw_klines:
-                    # Candle berjalan hanya ditampilkan live; dataset ML memakai candle selesai.
-                    if int(k[6]) >= int(time.time() * 1000):
-                        continue
-                    rows.append(
-                        {
-                            "timestamp": pd.to_datetime(int(k[0]), unit="ms", utc=True),
-                            "coin_symbol": symbol,
-                            "open": float(k[1]),
-                            "high": float(k[2]),
-                            "low": float(k[3]),
-                            "close": float(k[4]),
-                            "volume": float(k[5]),
-                            "quote_asset_volume": float(k[7]),
-                            "number_of_trades": int(k[8]),
-                            "taker_buy_base_volume": float(k[9]),
-                            "taker_buy_quote_volume": float(k[10]),
-                        }
-                    )
-                df_new = pd.DataFrame(rows)
+                df_new = _fetch_closed_klines(symbol, target_limit)
                 if df_new.empty:
                     raise ValueError("Belum ada candle selesai pada respons Binance")
             except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:

@@ -32,6 +32,7 @@ class MarketStreamTests(unittest.IsolatedAsyncioTestCase):
         self.directory = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
         self.stack.enter_context(patch.object(storage, "DROP_ZONE_DIR", self.directory))
         self.stack.enter_context(patch.object(storage, "AUDIT_LOG_PATH", self.directory / "audit.json"))
+        self.stack.enter_context(patch.object(storage, "NIFI_OUTBOX_DIR", self.directory / "nifi_outbox"))
         self.stream = module.MarketStream()
         self.queue = asyncio.Queue(maxsize=64)
         self.stream.subscribers.add(self.queue)

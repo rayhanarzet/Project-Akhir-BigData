@@ -22,6 +22,7 @@ export const Tab4HistoricalHdfs: React.FC = () => {
   yearAgo.setUTCDate(yearAgo.getUTCDate() - 364);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState<Timeframe>('1h');
+  const [source, setSource] = useState<'raw' | 'clean'>('raw');
   const [startDate, setStartDate] = useState(dateInput(yearAgo));
   const [endDate, setEndDate] = useState(dateInput(today));
   const [result, setResult] = useState<HistoricalHdfsRunResponse | null>(null);
@@ -39,10 +40,11 @@ export const Tab4HistoricalHdfs: React.FC = () => {
         start_date: startDate,
         end_date: endDate,
         features: DEFAULT_FEATURES,
-        cluster_k: 3,
+        gmm_components: 3,
         train_ratio: 0.8,
-        rf_num_trees: 100,
-        rf_max_depth: 10,
+        gb_max_iter: 200,
+        gb_max_depth: 10,
+        source,
       });
       setResult(data);
     } catch (err) {
@@ -59,7 +61,7 @@ export const Tab4HistoricalHdfs: React.FC = () => {
           <div className="rounded-md bg-cyan-400/15 p-2 text-cyan-300"><Database className="h-5 w-5" /></div>
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide">Historical HDFS Batch</h2>
-            <p className="text-xs text-white/60">Baca CSV NiFi dari /arkadanta/raw, proses dengan PySpark, lalu latih model Spark MLlib.</p>
+            <p className="text-xs text-white/60">Baca CSV yang dikirim NiFi ke HDFS, proses fitur dengan PySpark, lalu latih GMM + HistGradientBoosting yang dipakai prediksi live.</p>
           </div>
         </div>
 
@@ -72,6 +74,12 @@ export const Tab4HistoricalHdfs: React.FC = () => {
           <label className="text-xs text-white/70">Timeframe hasil
             <select value={timeframe} onChange={(e) => setTimeframe(e.target.value as Timeframe)} className="mt-1 w-full rounded border border-white/15 bg-[#1e1e2f] p-2 text-sm text-white">
               {SUPPORTED_TIMEFRAMES.map((tf) => <option key={tf}>{tf}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-white/70">Sumber HDFS
+            <select value={source} onChange={(e) => setSource(e.target.value as 'raw' | 'clean')} className="mt-1 w-full rounded border border-white/15 bg-[#1e1e2f] p-2 text-sm text-white">
+              <option value="raw">Raw — dump historis Binance (/arkadanta/raw)</option>
+              <option value="clean">Clean — data aplikasi via NiFi outbox</option>
             </select>
           </label>
           <label className="text-xs text-white/70">Dari tanggal
@@ -95,8 +103,8 @@ export const Tab4HistoricalHdfs: React.FC = () => {
           {[
             ['Baris OHLCV valid', result.raw_valid_rows.toLocaleString()],
             ['Baris timeframe', result.feature_rows.toLocaleString()],
-            ['Accuracy klasifikasi', `${(result.accuracy * 100).toFixed(1)}%`],
-            ['RMSE volatilitas', result.rmse.toFixed(6)],
+            ['Accuracy klasifikasi', `${(result.classification_metrics.accuracy * 100).toFixed(1)}%`],
+            ['RMSE volatilitas', result.regression_metrics.rmse.toFixed(6)],
           ].map(([label, value]) => <div key={label} className="rounded-lg border border-white/10 bg-[#27293d] p-4"><p className="text-[10px] uppercase tracking-wide text-white/50">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>)}
         </section>
         <section className="rounded-lg border border-white/10 bg-[#27293d] p-5 text-sm">
@@ -107,10 +115,10 @@ export const Tab4HistoricalHdfs: React.FC = () => {
             <div><dt className="text-xs text-white/50">Aset / timeframe</dt><dd>{result.symbol} / {result.timeframe}</dd></div>
             <div className="md:col-span-2"><dt className="text-xs text-white/50">Input HDFS</dt><dd className="break-all font-mono text-xs">{result.input_path}</dd></div>
             <div><dt className="text-xs text-white/50">Timestamp terbaca</dt><dd>{result.data_start} — {result.data_end}</dd></div>
-            <div><dt className="text-xs text-white/50">F1 / MAE</dt><dd>{result.f1_score.toFixed(4)} / {result.mae.toFixed(6)}</dd></div>
+            <div><dt className="text-xs text-white/50">F1 / MAE</dt><dd>{result.classification_metrics.f1_macro.toFixed(4)} / {result.regression_metrics.mae.toFixed(6)}</dd></div>
             <div className="md:col-span-2"><dt className="text-xs text-white/50">Data fitur tersimpan</dt><dd className="break-all font-mono text-xs">{result.curated_path}</dd></div>
-            <div className="md:col-span-2"><dt className="text-xs text-white/50">Model MLlib</dt><dd className="break-all font-mono text-xs">{result.model_path || 'Dilatih untuk evaluasi run ini; tidak disimpan sebagai artefak lokal pada Windows tanpa winutils.'}</dd></div>
-            <div><dt className="text-xs text-white/50">Silhouette K-Means</dt><dd>{result.silhouette_score.toFixed(4)}</dd></div>
+            <div className="md:col-span-2"><dt className="text-xs text-white/50">Bundle model GMM/HGB (dipakai /api/ml/predict)</dt><dd className="break-all font-mono text-xs">{result.model_path}</dd></div>
+            <div><dt className="text-xs text-white/50">Silhouette GMM / BIC</dt><dd>{result.gmm_metrics.silhouette_score?.toFixed(4) ?? '-'} / {result.gmm_metrics.bic.toFixed(1)}</dd></div>
             <div><dt className="text-xs text-white/50">Run ID</dt><dd className="font-mono text-xs">{result.run_id}</dd></div>
           </dl>
         </section>

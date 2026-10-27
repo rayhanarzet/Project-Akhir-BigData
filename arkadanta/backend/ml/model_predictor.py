@@ -9,20 +9,20 @@ from threadpoolctl import threadpool_limits
 
 from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.analytics.timeframe_aggregator import aggregate_timeframe
-from backend.ml.model_trainer import MODEL_VERSION, bundle_path, metrics_path, model_directory, train_dynamic_models, training_lock
+from backend.ml.model_trainer import MODEL_VERSION, bundle_path, metrics_path, model_directory
 from backend.schemas import DynamicConfig, PredictRequest
 from data.storage import load_clean_ohlcv, ResearchDataError
 
 
 def load_or_train_bundle(symbol: str = "BTCUSDT", timeframe: str = "1h") -> Dict[str, Any]:
-    """Memuat model terlatih untuk simbol & timeframe, atau melatih otomatis jika belum ada."""
+    """Memuat model terlatih untuk simbol & timeframe. Training hanya lewat Model Lab/batch, bukan request prediksi."""
     # Namespace versi baru membuat artefak lama tetap tersimpan dan tidak termuat.
     validated = DynamicConfig(symbol=symbol.upper(), timeframe=timeframe)
     specific_path = bundle_path(validated.symbol, validated.timeframe)
-    with training_lock:
-        if not specific_path.exists():
-            train_dynamic_models(validated)
-        bundle = joblib.load(specific_path)
+    # Bundle ditulis atomik (replace), jadi membaca tanpa training_lock aman dan tidak menunggu training.
+    if not specific_path.exists():
+        raise ResearchDataError(f"Model {validated.symbol} {validated.timeframe} belum dilatih. Latih melalui Model Lab atau batch HDFS.")
+    bundle = joblib.load(specific_path)
     if bundle.get("model_version") != MODEL_VERSION:
         raise ResearchDataError("Versi model tidak cocok. Latih ulang GMM/HGB melalui Model Lab.")
     return bundle
@@ -107,13 +107,12 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
 
 
 def get_latest_metrics(symbol: str | None = None, timeframe: str | None = None) -> Dict[str, Any]:
-    """Mengambil metrik evaluasi model terakhir (atau memicu pelatihan default jika belum ada)."""
+    """Mengambil metrik evaluasi model terakhir."""
     config = DynamicConfig(symbol=symbol or "BTCUSDT", timeframe=timeframe or "1h")
     path = metrics_path(config.symbol, config.timeframe) if symbol or timeframe else model_directory() / "latest_metrics.json"
-    with training_lock:
-        if not path.exists():
-            train_dynamic_models(config)
-        metrics = json.loads(path.read_text(encoding="utf-8"))
+    if not path.exists():
+        raise ResearchDataError("Belum ada model terlatih. Latih melalui Model Lab atau batch HDFS.")
+    metrics = json.loads(path.read_text(encoding="utf-8"))
     if metrics.get("model_version") != MODEL_VERSION:
         raise ResearchDataError("Metrik model lama tidak digunakan. Latih ulang model GMM/HGB.")
     return metrics

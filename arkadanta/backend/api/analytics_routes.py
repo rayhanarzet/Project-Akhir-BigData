@@ -1,6 +1,6 @@
 """[ORANG 2] Endpoint Analitik BI, Deteksi Anomali, dan Korelasi Lintas Aset (Bab 3.3 & Bab 5)."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 import pandas as pd
 
 from backend.analytics.anomaly_detector import detect_anomalies
@@ -10,9 +10,9 @@ from backend.analytics.correlation_analyzer import (
 )
 from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.analytics.timeframe_aggregator import aggregate_timeframe
-from backend.config import DEFAULT_SYMBOLS, DROP_ZONE_DIR
+from backend.config import DEFAULT_SYMBOLS
 from backend.schemas import DynamicConfig
-from data.storage import load_clean_ohlcv
+from data.storage import ResearchDataError, load_clean_ohlcv
 
 router = APIRouter(tags=["Analytics & BI (Orang 2)"])
 
@@ -25,35 +25,17 @@ def run_dynamic_analytics(config: DynamicConfig):
 
     df_feat = None
     if config.use_spark:
+        # Tidak ada fallback diam-diam: kegagalan Spark dilaporkan agar engine yang dipakai jelas.
+        from spark_jobs.batch_analytics import prepare_spark_features
         try:
-            from pyspark.sql import SparkSession
-            from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
-            from spark_jobs.feature_pipeline import spark_compute_features
-
-            load_clean_ohlcv(symbol)
-            input_csv = str(DROP_ZONE_DIR / f"{symbol}_5m_clean.csv")
-            spark = (
-                SparkSession.builder.appName(f"Arkadanta-Analytics-{symbol}-{config.timeframe}")
-                .master("local[*]")
-                .getOrCreate()
-            )
-            spark.sparkContext.setLogLevel("ERROR")
-            try:
-                sdf_raw = spark.read.csv(input_csv, header=True, inferSchema=True)
-                sdf_agg = spark_aggregate_timeframe(sdf_raw, timeframe=config.timeframe)
-                sdf_feat = spark_compute_features(
-                    sdf_agg,
-                    ma_period=config.ma_period,
-                    rsi_period=config.rsi_period,
-                    rolling_window=config.rolling_window,
-                )
-                df_feat = sdf_feat.toPandas()
-                execution_engine = "PySpark SQL (Batch Layer)"
-            finally:
-                spark.stop()
-        except Exception:
-            df_feat = None
-            execution_engine = "Pandas + Scikit-Learn (PySpark Local Fallback)"
+            df_feat = prepare_spark_features(config)
+        except ResearchDataError:
+            raise
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"PySpark gagal: {exc}. Nonaktifkan use_spark untuk memakai pandas.") from exc
+        execution_engine = "PySpark SQL (Batch Layer)"
 
     if df_feat is None:
         df_5m = load_clean_ohlcv(symbol)
@@ -85,7 +67,10 @@ def run_dynamic_analytics(config: DynamicConfig):
     )
 
     df_anom["timestamp"] = df_anom["timestamp"].astype(str)
-    anomalies_only = df_anom[df_anom["is_anomaly"]].tail(100).to_dict(orient="records")
+    # JSON tidak menerima NaN; mikrostruktur yang tidak tersedia dikirim sebagai null.
+    anomaly_mask = df_anom["is_anomaly"].astype(bool)
+    df_anom = df_anom.astype(object).where(df_anom.notna(), None)
+    anomalies_only = df_anom[anomaly_mask].tail(100).to_dict(orient="records")
     series_records = df_anom.tail(400).to_dict(orient="records")
 
     return {

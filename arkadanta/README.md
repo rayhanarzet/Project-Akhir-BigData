@@ -19,7 +19,7 @@ Aplikasi tidak lagi membuat dataset sintetis saat startup, membaca data, atau ke
 
 Setelah memperbarui kode, restart backend, Vite, dan Streamlit. Pada awalnya status `NO_DATA` adalah normal. Buka tab **Data Ingestion**, pilih aset, lalu **Manual Sync Now**, atau unggah CSV/JSON nyata yang sumbernya sudah Anda periksa. Jangan unggah kembali dataset lama yang belum diverifikasi. Streamlit menyediakan panel ambil/unggah data sebelum analisis.
 
-Sinkronisasi mengambil candle terbaru, belum histori satu tahun. Jika Binance gagal, data aset yang gagal tidak diganti; aset yang sudah berhasil pada permintaan yang sama tetap tersimpan dan tercatat di audit. Berkas lokal dilaporkan sebagai `QUEUED_DROP_ZONE`, bukan bukti bahwa HDFS telah tersinkronisasi.
+**Manual Sync** mengambil candle terbaru. **Backfill Histori** (`POST /api/ingestion/backfill`, maks. 365 hari) menarik histori 5m per halaman 1000 candle. Jika Binance gagal, data aset yang gagal tidak diganti; aset yang sudah berhasil pada permintaan yang sama tetap tersimpan dan tercatat di audit. Berkas lokal dilaporkan sebagai `QUEUED_DROP_ZONE`, bukan bukti bahwa HDFS telah tersinkronisasi.
 
 Pengujian pemisahan data (tanpa akses jaringan, memakai berkas sementara):
 
@@ -37,9 +37,9 @@ Backend membuka satu Binance WebSocket publik untuk empat aset ketika dashboard 
 
 Candle berjalan hanya ditampilkan. Saat Binance menyatakan candle 5 menit selesai, backend menyimpannya secara atomik, mencatat audit, lalu memberitahu dashboard untuk mengambil ulang analisis dan prediksi. Candle disimpan dengan deduplikasi simbol + timestamp. Upload, REST sync, dan stream berbagi penguncian penulisan dalam satu proses. Grafik analisis historis tetap mengikuti timeframe yang dipilih; grafik tersebut tidak diganti dengan harga candle berjalan.
 
-Model yang sudah tersedia digunakan kembali saat inferensi; kode lama masih dapat melatih model ketika model belum tersedia. Siapkan histori nyata yang cukup dan latih model melalui Model Lab sebelum demonstrasi. Streaming tidak menggantikan pengambilan histori untuk pelatihan.
+Inferensi hanya memuat model yang sudah dilatih; request prediksi tidak pernah memicu training (respons 409 bila model belum ada). Siapkan histori nyata yang cukup dan latih model melalui Model Lab sebelum demonstrasi. Streaming tidak menggantikan pengambilan histori untuk pelatihan.
 
-Koneksi terputus ditampilkan secara jelas dan dicoba kembali dengan jeda bertahap. Harga tanpa pembaruan selama 15 detik ditandai sebagai data terakhir, bukan LIVE. Tidak ada data simulasi. Stream hanya aktif selama ada browser yang berlangganan; saat dashboard ditutup, koneksi dihentikan. Untuk mengisi candle yang terlewat saat dashboard/backend mati atau koneksi terputus, jalankan Manual Sync; mekanisme backfill histori panjang belum ditambahkan. NiFi/HDFS/Spark belum terhubung otomatis dengan stream ini.
+Koneksi terputus ditampilkan secara jelas dan dicoba kembali dengan jeda bertahap. Harga tanpa pembaruan selama 15 detik ditandai sebagai data terakhir, bukan LIVE. Tidak ada data simulasi. Stream hanya aktif selama ada browser yang berlangganan; saat dashboard ditutup, koneksi dihentikan. Untuk mengisi candle yang terlewat saat dashboard/backend mati atau koneksi terputus, jalankan Manual Sync atau Backfill Histori. Setiap candle baru juga masuk ke `data/research/nifi_outbox/` untuk dikirim NiFi ke HDFS.
 
 Jalankan **satu worker backend** untuk aplikasi lokal ini. Jangan menjalankan backend Windows dan WSL bersamaan pada dataset yang sama. Panel stream ada di React; dashboard Streamlit tetap menggunakan alur pengambilan data sebelumnya.
 
@@ -65,13 +65,16 @@ python -m unittest discover -s arkadanta/tests -p test_market_stream.py -v
 
 - **GaussianMixture (GMM)** menggantikan pengelompokan risiko. Mean setiap komponen dinilai dengan skor risiko, lalu diurutkan menjadi SAFE/WARNING/DANGER. Inisialisasi memakai `random_from_data`, bukan K-Means.
 - **HistGradientBoostingClassifier** memprediksi kelas risiko T+horizon dan probabilitasnya; **HistGradientBoostingRegressor** memprediksi volatilitas T+horizon. Early stopping acak dinonaktifkan untuk menjaga urutan waktu.
-- Train/test dibagi kronologis dengan embargo sepanjang horizon. Target latih terakhir serta fitting scaler/GMM selalu mendahului fitur uji pertama.
+- Train/test dibagi kronologis dengan embargo sepanjang horizon. Target latih terakhir serta fitting scaler/GMM selalu mendahului fitur uji pertama. Metrik berasal dari model holdout; model yang dipakai live dilatih ulang pada seluruh data berlabel (`deployed_model_fit_samples`).
+- Agregasi timeframe membuang bucket terakhir yang belum tertutup, sehingga prediksi tidak memakai candle 1h/4h/1d parsial. Minggu (`1w`) dimulai Senin 00:00 UTC pada pandas maupun Spark.
+- Fitur mikrostruktur (`buy_sell_pressure_ratio`, dsb.) hanya dihitung dari kolom sumber nyata. Jika CSV tidak memiliki kolom taker/trades, fitur tersebut ditolak, tidak diisi tebakan.
+- Ambang anomali `adaptive_quantile`, `iqr`, dan `rolling_zscore` hanya memakai data sebelum candle yang dinilai, sehingga label lama tidak berubah saat data baru masuk. Metode `gmm` di-fit pada seluruh rentang (analisis retrospektif, `causal: false`).
 - Evaluasi GMM memuat BIC, AIC, konvergensi, dan silhouette (dapat `null` jika komponen terisi tidak cukup). Klasifikasi/regresi tetap memakai Accuracy, Precision, Recall, F1, MAE, dan RMSE.
 - Grafik kepentingan fitur memakai **permutation importance terhadap macro F1 pada holdout**, maksimal 500 baris dan tiga pengulangan. Nilai negatif mungkin terjadi; grafik bukan bukti hubungan sebab-akibat dan tidak dipakai untuk memilih fitur/model.
 
 Parameter API/UI sekarang: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`, dan `target_horizon`. Nama lama `cluster_k`, `rf_num_trees`, `rf_max_depth`, serta metode anomali `kmeans` ditolak agar tidak diabaikan diam-diam. Metode anomali pengganti adalah `gmm` dengan skor negative log-likelihood. Metrik kelompok dikirim sebagai `gmm_metrics`; prediksi memakai `current_component_id`.
 
-Artefak baru disimpan di `data/research/models/gmm_hgb_v1/`, terpisah dari model lama. Setelah restart backend, latih ulang melalui **Model Lab → Train & Evaluate Models**. Pilih timeframe dengan data nyata yang cukup; minimal 30 + horizon candle dan setidaknya dua kelas pada data latih. Model/matriks fitur disimpan bersama konfigurasi indikator agar inferensi menggunakan parameter yang sama. Aplikasi dapat melatih default secara otomatis jika artefak baru belum tersedia.
+Artefak baru disimpan di `data/research/models/gmm_hgb_v1/`, terpisah dari model lama. Setelah restart backend, latih ulang melalui **Model Lab → Train & Evaluate Models**. Pilih timeframe dengan data nyata yang cukup; minimal 30 + horizon candle dan setidaknya dua kelas pada data latih. Model/matriks fitur disimpan bersama konfigurasi indikator agar inferensi menggunakan parameter yang sama. Hanya satu training berjalan sekaligus; permintaan kedua mendapat 429.
 
 **Jalur Spark:** agregasi/feature engineering memakai PySpark, kemudian fitur dikumpulkan ke driver untuk trainer GMM/HGB yang sama, dengan batas 500.000 baris. HistGradientBoosting tidak tersedia di Spark MLlib; pelatihan ini **bukan training terdistribusi**. Inferensi model yang dilatih dengan Spark juga memakai persiapan fitur Spark yang sama. Memilih Spark membutuhkan Java/PySpark yang berfungsi; kegagalan training Spark ditampilkan, tanpa penggantian engine diam-diam.
 
@@ -147,11 +150,17 @@ arkadanta/
 
 ### Jalur tambahan untuk data historis NiFi dan HDFS
 
-Alur lokal Arkadanta tetap sama. Untuk demo batch historis, jalankan NiFi secara
-terpisah dan arahkan file CSV OHLCV 5 menit ke `/arkadanta/raw`. Pipeline membaca
-CSV dari direktori tersebut dan memfilter simbol yang dipilih sebelum memproses
-data dengan PySpark dan melatih model Spark MLlib. Path input ini ditetapkan di
-konfigurasi backend sehingga tidak perlu diisi setiap kali menjalankan pipeline.
+Batch layer membaca HDFS dari salah satu dari dua sumber:
+
+- **raw** (`/arkadanta/raw`): dump histori Binance yang dimasukkan NiFi.
+- **clean** (`/user/arkadanta/data/clean/crypto/symbol=<S>/year=<Y>/month=<M>/`):
+  setiap baris baru aplikasi (upload, sync, backfill, candle live) ditulis ke
+  `data/research/nifi_outbox/`, lalu NiFi `GetFile → UpdateAttribute → PutHDFS`
+  mengirimnya (lihat `START.md` bagian 12).
+
+PySpark mengolah agregasi dan fitur. GMM + HistGradientBoosting dilatih di driver
+dengan trainer yang sama seperti Model Lab, dan bundle-nya disimpan ke
+`data/research/models/` sehingga langsung dipakai `/api/ml/predict`.
 
 Atur konfigurasi sebelum menyalakan FastAPI:
 
@@ -163,7 +172,7 @@ $env:ARKADANTA_HISTORICAL_OUTPUT_MODE = "local"
 
 Kemudian buka dashboard React dan pilih **Historical HDFS Batch**, atau gunakan
 `POST /api/historical-hdfs/run`. Endpoint menerima aset, timeframe, dan rentang
-tanggal (maksimum 365 hari); sumber input tetap `/arkadanta/raw`. Job menerima format Binance
+tanggal (maksimum 365 hari), serta `source` (`raw` atau `clean`). Job menerima format Binance
 Kline standar 12 kolom tanpa header maupun CSV ber-header
 `timestamp, open, high, low, close, volume`. `coin_symbol` opsional untuk file
 yang hanya berisi satu aset; jika tidak ada, simbol diambil dari pilihan aset.
@@ -173,11 +182,10 @@ metrik evaluasi, serta lokasi output dan model.
 Secara default, input dibaca dari HDFS sedangkan fitur (CSV) dan metrik (JSON)
 disimpan melalui filesystem Python di `data/processed/historical_hdfs/` pada
 mesin backend. Ini menghindari kebutuhan izin tulis HDFS dan `winutils.exe` pada
-Windows. Model MLlib dilatih dan dievaluasi pada run tersebut, tetapi tidak
-disimpan sebagai artefak dalam mode lokal. Jika admin memberi hak tulis pada
-direktori output HDFS, set `ARKADANTA_HISTORICAL_OUTPUT_MODE=hdfs` dan atur
-`ARKADANTA_HISTORICAL_HDFS_OUTPUT_PATH`; mode itu menyimpan Parquet dan artefak
-model di HDFS.
+Windows. Jika admin memberi hak tulis pada direktori output HDFS, set
+`ARKADANTA_HISTORICAL_OUTPUT_MODE=hdfs` dan atur
+`ARKADANTA_HISTORICAL_HDFS_OUTPUT_PATH`; mode itu menyimpan fitur sebagai Parquet
+dan metrik sebagai JSON di HDFS. Bundle model selalu disimpan lokal untuk serving.
 
 Spark perlu dapat menjangkau NameNode dan memakai konfigurasi Hadoop lokal.
 Jika distribusi Hadoop memerlukan `HADOOP_CONF_DIR`, set environment itu sebelum

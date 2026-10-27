@@ -37,6 +37,13 @@ class LiveSyncRequest(BaseModel):
     limit: int = Field(default=300, ge=50, le=1000)
 
 
+class BackfillRequest(BaseModel):
+    symbols: List[Literal["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT"]] = Field(
+        default_factory=lambda: ["BTCUSDT"], min_length=1
+    )
+    days: int = Field(default=365, ge=1, le=365)
+
+
 class CronConfigRequest(BaseModel):
     enabled: bool
     interval_minutes: int = Field(default=5, ge=1, le=1440)

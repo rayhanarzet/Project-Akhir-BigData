@@ -23,7 +23,16 @@ def spark_aggregate_timeframe(df_5m: DataFrame, timeframe: str = "1h") -> DataFr
     )
 
     win_duration = SPARK_WINDOW_MAP.get(timeframe, "1 hour")
-    df_bucketed = df.withColumn("time_bucket", F.window("timestamp", win_duration))
+    # Epoch 1970-01-01 adalah Kamis; geser 4 hari agar minggu mulai Senin seperti pandas W-MON.
+    start_time = "4 days" if timeframe == "1w" else "0 seconds"
+    df_bucketed = df.withColumn("time_bucket", F.window("timestamp", win_duration, win_duration, start_time))
+    # Bucket terakhir yang belum tertutup dibuang, konsisten dengan aggregate_timeframe pandas.
+    data_end = df.groupBy("coin_symbol").agg(
+        (F.max("timestamp") + F.expr("INTERVAL 5 MINUTES")).alias("data_end")
+    )
+    df_bucketed = df_bucketed.join(data_end, "coin_symbol").filter(
+        F.col("time_bucket.end") <= F.col("data_end")
+    ).drop("data_end")
 
     # Urutan timestamp eksplisit dalam setiap bucket agar open pertama & close terakhir deterministik
     w_asc = (

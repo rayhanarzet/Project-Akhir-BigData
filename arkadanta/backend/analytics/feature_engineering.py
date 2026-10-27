@@ -74,17 +74,11 @@ def compute_dynamic_features(
         g["lower_wick_ratio"] = (body_bottom - g["low"]) / candle_span
         g["body_ratio"] = (body_top - body_bottom) / candle_span
 
-        # 5. Mikrostruktur Pasar
-        if "quote_asset_volume" not in g.columns:
-            g["quote_asset_volume"] = g["volume"] * g["close"]
-        if "number_of_trades" not in g.columns:
-            g["number_of_trades"] = (g["volume"] * 15).astype(int)
-        if "taker_buy_base_volume" not in g.columns:
-            g["taker_buy_base_volume"] = g["volume"] * 0.5
-
-        g["buy_sell_pressure_ratio"] = g["taker_buy_base_volume"] / np.maximum(
-            g["volume"], 1e-8
-        )
+        # 5. Mikrostruktur Pasar: hanya dari kolom sumber nyata; baris tanpa sumber tetap NaN.
+        if "taker_buy_base_volume" in g.columns:
+            g["buy_sell_pressure_ratio"] = g["taker_buy_base_volume"] / np.maximum(
+                g["volume"], 1e-8
+            )
         vol_mean = g["volume"].rolling(window=rolling_window, min_periods=1).mean()
         vol_std = (
             g["volume"]
@@ -97,5 +91,13 @@ def compute_dynamic_features(
 
         out_frames.append(g)
 
-    result = pd.concat(out_frames, ignore_index=True)
-    return result.replace([np.inf, -np.inf], 0.0).fillna(0.0)
+    result = pd.concat(out_frames, ignore_index=True).replace([np.inf, -np.inf], 0.0)
+    keep_missing = [c for c in MICROSTRUCTURE_SOURCE_COLUMNS if c in result.columns]
+    return result.fillna({c: 0.0 for c in result.columns if c not in keep_missing})
+
+
+# Nilai hilang di kolom ini berarti sumber tidak menyediakannya, bukan nol.
+MICROSTRUCTURE_SOURCE_COLUMNS = (
+    "quote_asset_volume", "number_of_trades", "taker_buy_base_volume",
+    "taker_buy_quote_volume", "buy_sell_pressure_ratio",
+)

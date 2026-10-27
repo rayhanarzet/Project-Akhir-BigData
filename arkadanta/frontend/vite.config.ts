@@ -12,6 +12,12 @@ export default defineConfig({
         timeout: 15 * 60 * 1000,
         proxyTimeout: 15 * 60 * 1000,
       },
+      '/api/ingestion/backfill': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        timeout: 20 * 60 * 1000,
+        proxyTimeout: 20 * 60 * 1000,
+      },
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

@@ -110,6 +110,14 @@ def train_from_features(frame: pd.DataFrame, config: DynamicConfig, execution_en
             {"feature": name, "importance": round(float(mean), 6), "std": round(float(std), 6)}
             for name, mean, std in zip(feature_cols, importance.importances_mean, importance.importances_std)
         ], key=lambda record: record["importance"], reverse=True)
+        # Metrik di atas dari model holdout. Model yang disimpan untuk live dilatih ulang pada semua
+        # baris bertarget (definisi label GMM tetap) agar periode uji terbaru ikut dipelajari.
+        labeled = data.iloc[:len(data) - horizon]
+        holdout_classifier, holdout_regressor = classifier, regressor
+        classifier = HistGradientBoostingClassifier(class_weight="balanced", **parameters).fit(
+            labeled[feature_cols].to_numpy(dtype=float), labeled["target_risk"].tolist())
+        regressor = HistGradientBoostingRegressor(**parameters).fit(
+            labeled[feature_cols].to_numpy(dtype=float), labeled["target_volatility"].to_numpy(dtype=float))
         counts = data["current_risk_label"].value_counts()
         metadata = {
             "model_version": MODEL_VERSION, "trained_at": datetime.now(timezone.utc).isoformat(),
@@ -124,6 +132,7 @@ def train_from_features(frame: pd.DataFrame, config: DynamicConfig, execution_en
                 "train_end": str(train["timestamp"].iloc[-1]), "train_target_end": str(data["timestamp"].iloc[split - 1]),
                 "labeler_fit_end": str(data["timestamp"].iloc[split - 1]),
                 "test_start": str(test["timestamp"].iloc[0]), "test_end": str(test["timestamp"].iloc[-1]),
+                "deployed_model_fit_samples": len(labeled),
             },
             "gmm_metrics": {
                 "silhouette_score": round(labeler.silhouette, 4) if labeler.silhouette is not None else None,
@@ -142,7 +151,8 @@ def train_from_features(frame: pd.DataFrame, config: DynamicConfig, execution_en
             } for (_, row), predicted, volatility in list(zip(test.iterrows(), predicted_class, predicted_volatility))[-60:]],
         }
         bundle = {"model_version": MODEL_VERSION, "labeler": labeler, "classifier": classifier,
-                  "regressor": regressor, "config": config.model_dump(), "meta": metadata}
+                  "regressor": regressor, "holdout_classifier": holdout_classifier,
+                  "holdout_regressor": holdout_regressor, "config": config.model_dump(), "meta": metadata}
         model_directory().mkdir(parents=True, exist_ok=True)
         _save_bundle(bundle_path(config.symbol, config.timeframe), bundle)
         _save_metrics(metrics_path(config.symbol, config.timeframe), metadata)
