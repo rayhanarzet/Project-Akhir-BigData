@@ -74,7 +74,13 @@ HISTORICAL_OUTPUT_MODE = os.getenv(
     "ARKADANTA_HISTORICAL_OUTPUT_MODE", "local"
 ).strip().lower()
 HISTORICAL_LOCAL_OUTPUT_PATH = PROCESSED_DIR / "historical_hdfs"
-BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+# Mirror resmi Binance khusus data pasar publik; domain *.binance.com diblokir sebagian ISP Indonesia.
+BINANCE_KLINES_URL = os.getenv(
+    "ARKADANTA_BINANCE_KLINES_URL", "https://data-api.binance.vision/api/v3/klines"
+)
+BINANCE_STREAM_URL = os.getenv(
+    "ARKADANTA_BINANCE_STREAM_URL", "wss://data-stream.binance.vision/stream"
+)
 CORS_ORIGINS = os.getenv(
     "ARKADANTA_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 ).split(",")

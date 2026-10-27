@@ -8,7 +8,7 @@ import math
 import pandas as pd
 from websockets.asyncio.client import connect
 
-from backend.config import DEFAULT_SYMBOLS, HDFS_BASE_PATH
+from backend.config import BINANCE_STREAM_URL, DEFAULT_SYMBOLS, HDFS_BASE_PATH
 from data.storage import append_audit_logs, save_clean_ohlcv
 
 
@@ -136,7 +136,7 @@ class MarketStream:
 
     async def run(self) -> None:
         streams = "/".join(f"{symbol.lower()}@kline_5m" for symbol in DEFAULT_SYMBOLS)
-        url = f"wss://stream.binance.com:9443/stream?streams={streams}"
+        url = f"{BINANCE_STREAM_URL}?streams={streams}"
         delay = 1
         while True:
             self.set_status(False, "Menghubungkan ke Binance...")
