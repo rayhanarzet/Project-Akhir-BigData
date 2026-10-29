@@ -1,0 +1,792 @@
+[
+  {
+    "run_id": "cron_519ef739",
+    "timestamp": "2026-10-24T08:00:35.649802+00:00",
+    "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 665,
+    "rows_after": 665,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_7e3a5065",
+    "timestamp": "2026-10-24T08:00:36.593240+00:00",
+    "source_name": "Binance /api/v3/klines (ETHUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 665,
+    "rows_after": 665,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_e14dd238",
+    "timestamp": "2026-10-24T08:00:37.668892+00:00",
+    "source_name": "Binance /api/v3/klines (BNBUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2068,
+    "rows_after": 2068,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_15e9f5c3",
+    "timestamp": "2026-10-24T08:00:38.650395+00:00",
+    "source_name": "Binance /api/v3/klines (ADAUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2068,
+    "rows_after": 2068,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_8ea50b4b",
+    "timestamp": "2026-10-23T06:07:20.464302+00:00",
+    "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 664,
+    "rows_after": 605,
+    "duplicates_removed": 59,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_19c1df9e",
+    "timestamp": "2026-10-23T06:07:21.338365+00:00",
+    "source_name": "Binance /api/v3/klines (ETHUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 664,
+    "rows_after": 605,
+    "duplicates_removed": 59,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_8af3260e",
+    "timestamp": "2026-10-23T06:07:22.292439+00:00",
+    "source_name": "Binance /api/v3/klines (BNBUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2067,
+    "rows_after": 2008,
+    "duplicates_removed": 59,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_42b35b83",
+    "timestamp": "2026-10-23T06:07:23.231611+00:00",
+    "source_name": "Binance /api/v3/klines (ADAUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2067,
+    "rows_after": 2008,
+    "duplicates_removed": 59,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_c1764ec2",
+    "timestamp": "2026-10-23T06:04:17.475458+00:00",
+    "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 902,
+    "rows_after": 604,
+    "duplicates_removed": 298,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_4a16b1f3",
+    "timestamp": "2026-10-23T06:04:18.485114+00:00",
+    "source_name": "Binance /api/v3/klines (ETHUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 902,
+    "rows_after": 604,
+    "duplicates_removed": 298,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_8346d656",
+    "timestamp": "2026-10-23T06:04:19.643919+00:00",
+    "source_name": "Binance /api/v3/klines (BNBUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2305,
+    "rows_after": 2007,
+    "duplicates_removed": 298,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_8938645d",
+    "timestamp": "2026-10-23T06:04:20.747370+00:00",
+    "source_name": "Binance /api/v3/klines (ADAUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2305,
+    "rows_after": 2007,
+    "duplicates_removed": 298,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_c47b904b",
+    "timestamp": "2026-10-23T05:53:35.654721+00:00",
+    "source_name": "Binance /api/v3/klines (BTCUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 660,
+    "rows_after": 602,
+    "duplicates_removed": 58,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_d9bbffc5",
+    "timestamp": "2026-10-23T05:53:36.403349+00:00",
+    "source_name": "Binance /api/v3/klines (ETHUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 660,
+    "rows_after": 602,
+    "duplicates_removed": 58,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_cb7e6bac",
+    "timestamp": "2026-10-23T05:53:37.194346+00:00",
+    "source_name": "Binance /api/v3/klines (BNBUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2060,
+    "rows_after": 2005,
+    "duplicates_removed": 55,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "cron_d85e8849",
+    "timestamp": "2026-10-23T05:53:37.991341+00:00",
+    "source_name": "Binance /api/v3/klines (ADAUSDT 5m auto-sync)",
+    "format_detected": "BINANCE_API",
+    "selected_pipeline": "BinanceCronFetcher -> SchemaNormalizer -> Deduplicator -> DropZoneWriter",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2060,
+    "rows_after": 2005,
+    "duplicates_removed": 55,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "ing_c0c1dab9",
+    "timestamp": "2026-10-23T05:44:14.580207+00:00",
+    "source_name": "BTCUSDT-5m-2025-01.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "CSVParser -> SchemaAliasMapper -> DedupSorter -> ForwardFillImputer -> OHLCVSanityGuard",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "<default>": "coin_symbol=BTCUSDT"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 25,
+    "rows_after": 25,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 0,
+    "error_reasons": {
+      "high_less_than_low": 0,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "QUEUED_DROP_ZONE",
+    "quality_score_pct": 100.0
+  },
+  {
+    "run_id": "ing_71dc3f2f",
+    "timestamp": "2026-10-23T05:44:14.510920+00:00",
+    "source_name": "multi_test.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "CSVParser -> SchemaAliasMapper -> DedupSorter -> ForwardFillImputer -> OHLCVSanityGuard",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "rows_before": 4,
+    "rows_after": 3,
+    "duplicates_removed": 0,
+    "imputed_ohlc_rows": 0,
+    "imputed_volume_rows": 0,
+    "rejected_rows": 1,
+    "error_reasons": {
+      "high_less_than_low": 1,
+      "non_positive_price": 0,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data/drop_zone/BTCUSDT_5m_clean.csv, data/drop_zone/ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol={multi:BTCUSDT,ETHUSDT}/",
+    "nifi_hdfs_status": "QUEUED_DROP_ZONE",
+    "quality_score_pct": 75.0
+  },
+  {
+    "run_id": "init_btcusdt_001",
+    "timestamp": "2026-10-22T00:58:30.433691+00:00",
+    "source_name": "btcusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_ethusdt_001",
+    "timestamp": "2026-10-22T00:58:30.519758+00:00",
+    "source_name": "ethusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_bnbusdt_001",
+    "timestamp": "2026-10-22T00:58:30.601410+00:00",
+    "source_name": "bnbusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_adausdt_001",
+    "timestamp": "2026-10-22T00:58:30.686815+00:00",
+    "source_name": "adausdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_btcusdt_001",
+    "timestamp": "2026-10-23T05:28:57.892164+00:00",
+    "source_name": "btcusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "BTCUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\BTCUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_ethusdt_001",
+    "timestamp": "2026-10-23T05:28:57.960274+00:00",
+    "source_name": "ethusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "ETHUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\ETHUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ETHUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_bnbusdt_001",
+    "timestamp": "2026-10-23T05:28:58.027942+00:00",
+    "source_name": "bnbusdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "BNBUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\BNBUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BNBUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  },
+  {
+    "run_id": "init_adausdt_001",
+    "timestamp": "2026-10-23T05:28:58.089541+00:00",
+    "source_name": "adausdt_historical_5m.csv",
+    "format_detected": "CSV",
+    "selected_pipeline": "StandardCSVParser -> AliasMapper -> OHLCVSanityValidator -> ForwardFillImputer",
+    "column_mapping": {
+      "open_time": "timestamp",
+      "symbol": "coin_symbol",
+      "vol": "volume"
+    },
+    "symbols_detected": [
+      "ADAUSDT"
+    ],
+    "rows_before": 2018,
+    "rows_after": 2000,
+    "duplicates_removed": 11,
+    "imputed_ohlc_rows": 4,
+    "imputed_volume_rows": 2,
+    "rejected_rows": 7,
+    "error_reasons": {
+      "high_less_than_low": 5,
+      "non_positive_price": 2,
+      "negative_volume": 0,
+      "invalid_timestamp": 0
+    },
+    "drop_zone_path": "data\\drop_zone\\ADAUSDT_5m_clean.csv",
+    "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=ADAUSDT/",
+    "nifi_hdfs_status": "SYNCED",
+    "quality_score_pct": 99.1
+  }
+]
