@@ -1,7 +1,6 @@
 """Dedicated API routes for historical CSV data delivered to HDFS by NiFi."""
 
 from typing import Literal, Optional
-from threading import Lock
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,9 +17,6 @@ from backend.config import (
     HISTORICAL_HDFS_URI,
 )
 router = APIRouter(prefix="/api/historical-hdfs", tags=["Historical HDFS Batch"])
-# SparkSession.getOrCreate() shares a SparkContext within this backend process.
-# Serialize historical runs so one request cannot stop another request's context.
-_historical_spark_lock = Lock()
 
 
 class HistoricalHdfsRunRequest(BaseModel):
@@ -36,7 +32,7 @@ class HistoricalHdfsRunRequest(BaseModel):
     gb_max_iter: int = Field(default=200, ge=20, le=500)
     gb_max_depth: int = Field(default=10, ge=3, le=30)
     # raw: dump historis Binance yang dimasukkan NiFi; clean: data aplikasi dari NiFi outbox (berpartisi).
-    source: Literal["raw", "clean"] = "raw"
+    source: Literal["raw", "clean"] = "clean"
 
 
 @router.get("/config")
@@ -62,14 +58,16 @@ def get_historical_hdfs_config():
 @router.post("/run")
 def run_historical_hdfs(req: HistoricalHdfsRunRequest):
     """Read NiFi-delivered CSV from HDFS, process it, train Spark ML, and persist outputs."""
-    if not _historical_spark_lock.acquire(blocking=False):
-        raise HTTPException(status_code=429, detail="Pipeline historis lain sedang berjalan. Coba lagi setelah selesai.")
+    from spark_jobs.locks import SparkBusyError
+
     try:
         from spark_jobs.historical_hdfs_job import run_historical_hdfs_job
 
         params = req.model_dump(exclude={"source"})
         input_path = f"{HDFS_BASE_PATH.rstrip('/')}/symbol={req.symbol.upper()}" if req.source == "clean" else None
         return run_historical_hdfs_job(DynamicConfig(**params), input_path=input_path)
+    except SparkBusyError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -102,5 +100,3 @@ def run_historical_hdfs(req: HistoricalHdfsRunRequest):
             status_code=503,
             detail=f"Pipeline historis HDFS gagal. Periksa koneksi NameNode dan path NiFi. Detail: {error_text}",
         ) from exc
-    finally:
-        _historical_spark_lock.release()

@@ -22,6 +22,10 @@ def spark_compute_features(
             (F.col("high") - F.col("low")) / F.greatest(F.col("low"), F.lit(1e-8)),
         )
         .withColumn(
+            "periodic_return",
+            F.coalesce(F.col("close") / F.lag("close", 1).over(w_order) - F.lit(1.0), F.lit(0.0)),
+        )
+        .withColumn(
             "co_change",
             (F.col("close") - F.col("open")) / F.greatest(F.col("open"), F.lit(1e-8)),
         )
@@ -83,6 +87,12 @@ def spark_compute_features(
         )
         .withColumn("volume_zscore", (F.col("volume") - F.col("vol_mean")) / F.col("vol_std"))
     )
+
+    if "taker_buy_base_volume" in feat.columns:
+        feat = feat.withColumn(
+            "buy_sell_pressure_ratio",
+            F.col("taker_buy_base_volume") / F.greatest(F.col("volume"), F.lit(1e-8)),
+        )
 
     return feat.drop(
         "rolling_vol_mean", "bb_std", "price_diff", "gain", "loss", "avg_gain", "avg_loss", "vol_mean", "vol_std"

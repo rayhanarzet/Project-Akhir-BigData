@@ -9,6 +9,7 @@ import pandas as pd
 from backend.config import AUDIT_LOG_PATH, DROP_ZONE_DIR, NIFI_OUTBOX_DIR
 
 _write_lock = threading.RLock()
+_read_cache: dict[Path, tuple[tuple[int, int], pd.DataFrame]] = {}
 
 
 def _symbol(symbol: str) -> str:
@@ -37,6 +38,12 @@ def load_clean_ohlcv(symbol: str = "BTCUSDT") -> pd.DataFrame:
     file_path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
     if not file_path.exists():
         raise ResearchDataError(f"Data penelitian {symbol.upper()} belum tersedia. Unggah data nyata atau jalankan sinkronisasi Binance.")
+    # CSV setahun ~10 MB; baca ulang hanya bila berkas berubah (penulisan atomik mengganti mtime).
+    stat = file_path.stat()
+    version = (stat.st_mtime_ns, stat.st_size)
+    cached = _read_cache.get(file_path)
+    if cached is not None and cached[0] == version:
+        return cached[1].copy()
     try:
         df = pd.read_csv(file_path)
         if df.empty:
@@ -48,7 +55,8 @@ def load_clean_ohlcv(symbol: str = "BTCUSDT") -> pd.DataFrame:
     except (ValueError, KeyError, OSError) as exc:
         raise ResearchDataError(f"Data penelitian {symbol.upper()} tidak dapat dibaca: {exc}") from exc
     df = df.sort_values("timestamp").drop_duplicates(subset=["coin_symbol", "timestamp"]).reset_index(drop=True)
-    return df
+    _read_cache[file_path] = (version, df)
+    return df.copy()
 
 
 def load_audit_logs() -> List[dict]:
@@ -70,17 +78,17 @@ def append_audit_logs(logs: List[dict]) -> None:
         save_audit_logs((logs + load_audit_logs())[:50])
 
 
-def save_clean_ohlcv(symbol: str, frame: pd.DataFrame, *, merge: bool = True) -> tuple[int, int]:
+def save_clean_ohlcv(symbol: str, frame: pd.DataFrame) -> tuple[int, int]:
     """Serialisasi penulis upload/REST/stream dalam satu worker; pembaca melihat berkas utuh."""
     # shortcut: setiap simpan menulis ulang CSV aset (~10 MB/tahun 5m), O(n) per candle; cukup untuk
     # 4 aset x 1 tahun. Untuk multi-tahun, pindahkan speed layer ke berkas append per bulan/Parquet.
     symbol = _symbol(symbol)
     path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
     with _write_lock:
+        # Selalu gabung: data baru tidak pernah menghapus histori yang sudah ada.
         existing = load_clean_ohlcv(symbol) if path.exists() else None
-        previous = existing if merge else None
-        rows_before = len(frame) + (len(previous) if previous is not None else 0)
-        output = pd.concat([previous, frame], ignore_index=True) if previous is not None else frame.copy()
+        rows_before = len(frame) + (len(existing) if existing is not None else 0)
+        output = pd.concat([existing, frame], ignore_index=True) if existing is not None else frame.copy()
         output["timestamp"] = pd.to_datetime(output["timestamp"], utc=True)
         output = output.sort_values("timestamp").drop_duplicates(["coin_symbol", "timestamp"], keep="last")
         _atomic_write(path, output.to_csv(index=False))

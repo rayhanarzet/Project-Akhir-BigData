@@ -35,7 +35,7 @@ export interface IngestionAuditReport {
   };
   drop_zone_path: string;
   hdfs_target_path: string;
-  nifi_hdfs_status: 'SYNCED' | 'QUEUED_DROP_ZONE' | 'LOCAL_FALLBACK';
+  nifi_hdfs_status: 'QUEUED_DROP_ZONE';
   quality_score_pct: number;
 }
 
@@ -189,6 +189,12 @@ export interface ModelMetricsResponse {
   regression_metrics: {
     mae: number;
     rmse: number;
+  };
+  // Tidak ada pada metrik yang dilatih sebelum baseline ditambahkan.
+  baseline_metrics?: {
+    majority_accuracy: number;
+    persistence_accuracy: number;
+    persistence_rmse: number;
   };
   feature_importances: { feature: string; importance: number }[];
 }

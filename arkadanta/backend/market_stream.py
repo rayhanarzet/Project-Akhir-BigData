@@ -9,6 +9,7 @@ import pandas as pd
 from websockets.asyncio.client import connect
 
 from backend.config import BINANCE_STREAM_URL, DEFAULT_SYMBOLS, HDFS_BASE_PATH
+from backend.scheduler import cron_scheduler
 from data.storage import append_audit_logs, save_clean_ohlcv
 
 
@@ -134,6 +135,17 @@ class MarketStream:
             self.saved[quote["symbol"]] = quote["candle_time"]
             self.publish({"type": "candle_closed", "symbol": quote["symbol"], "candle_time": quote["candle_time"]})
 
+    async def fill_gaps(self) -> None:
+        """Isi candle yang terlewat saat backend/stream mati, agar analisis & prediksi tidak memakai data basi."""
+        for symbol in DEFAULT_SYMBOLS:
+            try:
+                added = await asyncio.to_thread(cron_scheduler.fill_gap, symbol)
+            except Exception as exc:  # REST gagal tidak boleh memutus stream harga live
+                self.publish({"type": "storage_error", "message": f"Candle terlewat {symbol} gagal diambil: {exc}"})
+                continue
+            if added:
+                self.publish({"type": "candle_closed", "symbol": symbol, "candle_time": None})
+
     async def run(self) -> None:
         streams = "/".join(f"{symbol.lower()}@kline_5m" for symbol in DEFAULT_SYMBOLS)
         url = f"{BINANCE_STREAM_URL}?streams={streams}"
@@ -143,6 +155,8 @@ class MarketStream:
             try:
                 async with connect(url, open_timeout=10, ping_interval=20, ping_timeout=20, max_size=65536) as socket:
                     self.set_status(True, "Terhubung ke Binance WebSocket")
+                    # Sebelum membaca event: candle yang tersimpan setelah ini akan menggeser titik awal celah.
+                    await self.fill_gaps()
                     async for raw in socket:
                         await self.handle_message(json.loads(raw))
                         delay = 1

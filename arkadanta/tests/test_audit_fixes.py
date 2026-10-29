@@ -1,4 +1,6 @@
 """Regresi untuk perbaikan audit: bucket parsial, minggu Senin, mikrostruktur palsu, ambang kausal, prediksi tanpa model."""
+from contextlib import contextmanager
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -14,8 +16,12 @@ from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.analytics.timeframe_aggregator import aggregate_timeframe
 from backend.ml import model_predictor, model_trainer
 from backend.ml.dynamic_feature_selector import select_and_prepare_features
-from backend.schemas import PredictRequest
+from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
+from backend.schemas import DynamicConfig, PredictRequest
+from data import storage
+from data.sample_generator import generate_synthetic_5m_ohlcv
 from data.storage import ResearchDataError
+from spark_jobs.locks import SparkBusyError, exclusive_spark
 
 
 def candles(start: str, count: int) -> pd.DataFrame:
@@ -25,6 +31,13 @@ def candles(start: str, count: int) -> pd.DataFrame:
 
 
 class AuditFixTests(unittest.TestCase):
+    @staticmethod
+    @contextmanager
+    def _without_java_home():
+        # Uji lock tanpa bergantung pada JAVA_HOME mesin ini (dipulihkan oleh patch.dict pemanggil).
+        os.environ.pop("JAVA_HOME", None)
+        yield
+
     def test_partial_last_bucket_is_dropped(self):
         hourly = aggregate_timeframe(candles("2026-10-05 00:00", 12 * 3 + 3), "1h")
         self.assertEqual(len(hourly), 3)
@@ -55,6 +68,70 @@ class AuditFixTests(unittest.TestCase):
             before, _ = detect_anomalies(features, method=method)
             after, _ = detect_anomalies(extended, method=method)
             pd.testing.assert_series_equal(before["is_anomaly"], after["is_anomaly"].iloc[:len(before)], check_names=False)
+
+    def test_bucket_with_missing_candle_is_dropped(self):
+        frame = candles("2026-10-05 00:00", 12 * 3).drop(index=15)  # jam kedua kehilangan satu candle
+        hourly = aggregate_timeframe(frame, "1h")
+        self.assertEqual(list(hourly["timestamp"].dt.hour), [0, 2])
+
+    def test_upload_merges_with_existing_history(self):
+        with tempfile.TemporaryDirectory() as root, \
+                patch.object(storage, "DROP_ZONE_DIR", Path(root)), \
+                patch.object(storage, "NIFI_OUTBOX_DIR", Path(root) / "outbox"), \
+                patch.object(storage, "AUDIT_LOG_PATH", Path(root) / "audit.json"):
+            storage.save_clean_ohlcv("BTCUSDT", candles("2026-10-05 00:00", 100))
+            upload = candles("2026-10-05 08:20", 5).assign(timestamp=lambda d: d["timestamp"].astype(str))
+            run_dynamic_ingestion_pipeline("kecil.csv", upload.to_csv(index=False).encode(), default_symbol="BTCUSDT")
+            self.assertEqual(len(storage.load_clean_ohlcv("BTCUSDT")), 105)
+
+    def test_cached_read_returns_fresh_data_after_write(self):
+        with tempfile.TemporaryDirectory() as root, \
+                patch.object(storage, "DROP_ZONE_DIR", Path(root)), \
+                patch.object(storage, "NIFI_OUTBOX_DIR", Path(root) / "outbox"):
+            storage.save_clean_ohlcv("BTCUSDT", candles("2026-10-05", 10))
+            first = storage.load_clean_ohlcv("BTCUSDT")
+            first.loc[0, "close"] = -1  # pemanggil mengubah salinan, bukan cache
+            self.assertEqual(storage.load_clean_ohlcv("BTCUSDT").loc[0, "close"], 1.5)
+            storage.save_clean_ohlcv("BTCUSDT", candles("2026-10-05 00:50", 1))
+            self.assertEqual(len(storage.load_clean_ohlcv("BTCUSDT")), 11)
+
+    def test_second_spark_job_is_rejected_not_interleaved(self):
+        with patch.dict("os.environ"), self._without_java_home(), exclusive_spark():
+            with self.assertRaises(SparkBusyError):
+                with exclusive_spark():
+                    pass
+        with patch.dict("os.environ"), self._without_java_home(), exclusive_spark():
+            pass  # lock dilepas setelah job pertama selesai
+
+    def test_broken_java_home_fails_fast_instead_of_hanging(self):
+        with patch.dict("os.environ", {"JAVA_HOME": str(Path(tempfile.gettempdir()) / "tidak-ada-jdk")}):
+            with self.assertRaisesRegex(ValueError, "JAVA_HOME"):
+                with exclusive_spark():
+                    pass
+        with patch.dict("os.environ"), self._without_java_home(), exclusive_spark():
+            pass  # pemeriksaan gagal tidak menahan lock
+
+    def test_training_reports_naive_baselines(self):
+        raw = generate_synthetic_5m_ohlcv(n_candles=600)
+        features = compute_dynamic_features(aggregate_timeframe(raw, "5m"))
+        with tempfile.TemporaryDirectory() as root, patch.object(model_trainer, "MODELS_DIR", Path(root)):
+            metrics = model_trainer.train_from_features(features, DynamicConfig(timeframe="5m", gb_max_iter=20), "test")
+        baseline = metrics["baseline_metrics"]
+        self.assertTrue(0 <= baseline["majority_accuracy"] <= 1)
+        self.assertTrue(0 <= baseline["persistence_accuracy"] <= 1)
+        self.assertGreater(baseline["persistence_rmse"], 0)
+
+    def test_prediction_refuses_stale_candles(self):
+        raw = generate_synthetic_5m_ohlcv(n_candles=600)
+        raw["timestamp"] = pd.to_datetime(raw["timestamp"], utc=True) - pd.Timedelta(days=2)  # backend mati 2 hari
+        with tempfile.TemporaryDirectory() as root, \
+                patch.object(storage, "DROP_ZONE_DIR", Path(root)), \
+                patch.object(storage, "NIFI_OUTBOX_DIR", Path(root) / "outbox"), \
+                patch.object(model_trainer, "MODELS_DIR", Path(root) / "models"):
+            storage.save_clean_ohlcv("BTCUSDT", raw)
+            model_trainer.train_dynamic_models(DynamicConfig(timeframe="5m", gb_max_iter=20))
+            with self.assertRaisesRegex(ResearchDataError, "Backfill"):
+                model_predictor.predict_next_period(PredictRequest(timeframe="5m"))
 
     def test_predict_without_model_does_not_train_inside_request(self):
         with tempfile.TemporaryDirectory() as root, \

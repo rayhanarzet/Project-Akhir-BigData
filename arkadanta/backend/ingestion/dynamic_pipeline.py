@@ -99,12 +99,12 @@ def run_dynamic_ingestion_pipeline(
     for sym, sym_df in df_clean.groupby("coin_symbol"):
         sym_path = DROP_ZONE_DIR / f"{sym}_5m_clean.csv"
         sym_clean = sym_df.sort_values("timestamp").reset_index(drop=True)
-        save_clean_ohlcv(sym, sym_clean, merge=False)
+        save_clean_ohlcv(sym, sym_clean)
         saved_paths.append(f"data/research/drop_zone/{sym_path.name}")
 
     if not saved_paths:
         out_path = DROP_ZONE_DIR / f"{primary_sym}_5m_clean.csv"
-        save_clean_ohlcv(primary_sym, df_clean, merge=False)
+        save_clean_ohlcv(primary_sym, df_clean)
         saved_paths.append(f"data/research/drop_zone/{out_path.name}")
 
     rows_after = len(df_clean)

@@ -1,16 +1,12 @@
 """Endpoint Ingestion & Historical Baseline (Kontrak Orang 1 <-> Orang 2)."""
 
 import asyncio
-from datetime import datetime, timezone
 import json
 from typing import Optional
-import uuid
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-import pandas as pd
 import requests
 
 from backend.config import (
-    BINANCE_KLINES_URL,
     DEFAULT_SYMBOLS,
     DROP_ZONE_DIR,
     HDFS_BASE_PATH,
@@ -25,11 +21,7 @@ from backend.schemas import (
     LiveSyncRequest,
 )
 from backend.scheduler import cron_scheduler
-from data.storage import (
-    load_audit_logs,
-    load_clean_ohlcv,
-    save_audit_logs,
-)
+from data.storage import load_audit_logs, load_clean_ohlcv
 
 router = APIRouter(tags=["Ingestion & Baseline"])
 

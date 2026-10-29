@@ -22,7 +22,7 @@ from backend.ml.risk_labeler import DynamicRiskLabeler
 from backend.schemas import DynamicConfig
 from data.storage import load_clean_ohlcv
 
-MODEL_VERSION = "gmm_hgb_v1"
+MODEL_VERSION = "gmm_hgb_v2"
 training_lock = threading.RLock()
 
 
@@ -143,6 +143,13 @@ def train_from_features(frame: pd.DataFrame, config: DynamicConfig, execution_en
             },
             "classification_metrics": evaluate_classification(test["target_risk"].tolist(), predicted_class),
             "regression_metrics": evaluate_regression(test["target_volatility"].to_numpy(dtype=float), predicted_volatility),
+            # Pembanding naif pada holdout yang sama: model berguna hanya jika mengalahkan angka ini.
+            "baseline_metrics": {
+                "majority_accuracy": round(float((test["target_risk"] == train["target_risk"].mode()[0]).mean()), 4),
+                "persistence_accuracy": round(float((test["target_risk"] == test["current_risk_label"]).mean()), 4),
+                "persistence_rmse": round(float(np.sqrt(np.mean(
+                    (test["target_volatility"] - test["max_volatility"]).to_numpy(dtype=float) ** 2))), 6),
+            },
             "feature_importance_method": "permutation_f1_macro_holdout", "feature_importances": importances,
             "test_predictions_preview": [{
                 "timestamp": str(row["timestamp"]), "close": round(float(row["close"]), 4),

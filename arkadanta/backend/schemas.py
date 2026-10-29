@@ -1,6 +1,6 @@
 """Skema Pydantic untuk request/response API dan kontrak integrasi Orang 1 & Orang 2."""
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -23,9 +23,8 @@ class IngestionAuditReport(BaseModel):
     error_reasons: Dict[str, int] = Field(default_factory=dict)
     drop_zone_path: str
     hdfs_target_path: str
-    nifi_hdfs_status: Literal["SYNCED", "QUEUED_DROP_ZONE", "LOCAL_FALLBACK"] = (
-        "SYNCED"
-    )
+    # Aplikasi hanya menaruh berkas di NiFi outbox; tidak ada konfirmasi balik dari HDFS.
+    nifi_hdfs_status: Literal["QUEUED_DROP_ZONE"] = "QUEUED_DROP_ZONE"
     quality_score_pct: float
 
 

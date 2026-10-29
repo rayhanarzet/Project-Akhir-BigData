@@ -66,7 +66,7 @@ def aggregate_timeframe(
             "low": "min",
             "close": "last",
             "volume": "sum",
-            "candle_volatility": ["max", "mean"],
+            "candle_volatility": ["max", "mean", "count"],
         }
         for opt_col in (
             "quote_asset_volume",
@@ -83,9 +83,10 @@ def aggregate_timeframe(
             for c in res.columns
         ]
         res = res.dropna(subset=["open", "high", "low", "close"]).reset_index()
-        # Bucket terakhir yang belum tertutup akan bias rendah pada volume/volatilitas; jangan dipakai.
-        data_end = grp.index.max() + BASE_CANDLE
-        res = res[res["timestamp"] + TIMEFRAME_DURATION[timeframe] <= data_end].reset_index(drop=True)
+        # Hanya bucket dengan candle 5m lengkap: bucket berjalan (terakhir) atau berlubang (data hilang)
+        # akan bias rendah pada volume/volatilitas.
+        expected = int(TIMEFRAME_DURATION[timeframe] / BASE_CANDLE)
+        res = res[res["candle_volatility_count"] == expected].reset_index(drop=True)
         res["coin_symbol"] = sym
         res["max_volatility"] = np.maximum(
             res["candle_volatility_max"],
@@ -93,7 +94,7 @@ def aggregate_timeframe(
         )
         res["avg_volatility"] = res["candle_volatility_mean"]
         res["log_return"] = np.log(res["close"] / res["close"].shift(1)).fillna(0.0)
-        res = res.drop(columns=["candle_volatility_max", "candle_volatility_mean"])
+        res = res.drop(columns=["candle_volatility_max", "candle_volatility_mean", "candle_volatility_count"])
         results.append(res)
 
     return pd.concat(results, ignore_index=True)

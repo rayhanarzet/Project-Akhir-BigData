@@ -1,5 +1,5 @@
 
-# Hasil run & data pasar nyata: tidak di-commit (fixture test ada di data/raw/sample.* dan duplicate.csv)
+# Hasil run & data pasar nyata: tidak di-commit
 data/processed/
 data/raw/*-5m-*.csv
 vite.config.ts.timestamp-*.mjs

@@ -1,14 +1,15 @@
 """[ORANG 2] Inferensi T+1 untuk kelas risiko (SAFE/WARNING/DANGER), estimasi volatilitas, Resistance, dan Stop Loss (Bab 5.6)."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from typing import Any, Dict
 import joblib
 import numpy as np
+import pandas as pd
 from threadpoolctl import threadpool_limits
 
 from backend.analytics.feature_engineering import compute_dynamic_features
-from backend.analytics.timeframe_aggregator import aggregate_timeframe
+from backend.analytics.timeframe_aggregator import BASE_CANDLE, TIMEFRAME_DURATION, aggregate_timeframe
 from backend.ml.model_trainer import MODEL_VERSION, bundle_path, metrics_path, model_directory
 from backend.schemas import DynamicConfig, PredictRequest
 from data.storage import load_clean_ohlcv, ResearchDataError
@@ -42,15 +43,20 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
         raise ResearchDataError(f"Model dilatih untuk horizon {meta['target_horizon']}. Pilih horizon yang sama atau latih ulang.")
 
     config = DynamicConfig(**bundle["config"])
-    if config.use_spark:
-        from spark_jobs.batch_analytics import prepare_spark_features
-        df_feat = prepare_spark_features(config.model_copy(update={"start_date": None, "end_date": None}))
-    else:
-        df_5m = load_clean_ohlcv(symbol)
-        df_agg = aggregate_timeframe(df_5m, timeframe=req.timeframe)
-        df_feat = compute_dynamic_features(df_agg, ma_period=config.ma_period,
-                                          rsi_period=config.rsi_period, rolling_window=config.rolling_window)
+    # Fitur pandas identik dengan fitur Spark (tests/test_spark_parity.py), jadi model hasil Spark
+    # pun dilayani tanpa menyalakan Spark di setiap request prediksi.
+    df_agg = aggregate_timeframe(load_clean_ohlcv(symbol), timeframe=req.timeframe)
+    df_feat = compute_dynamic_features(df_agg, ma_period=config.ma_period,
+                                      rsi_period=config.rsi_period, rolling_window=config.rolling_window)
     latest_row = df_feat.sort_values("timestamp").iloc[-1].copy()
+    # Candle lengkap terakhir normalnya selesai < 1 periode lalu; lebih tua berarti ada data yang terlewat.
+    duration = TIMEFRAME_DURATION.get(req.timeframe, BASE_CANDLE)
+    candle_end = pd.Timestamp(latest_row["timestamp"]) + duration
+    if datetime.now(timezone.utc) - candle_end > duration + timedelta(minutes=30):
+        raise ResearchDataError(
+            f"Candle {req.timeframe} lengkap terakhir selesai {candle_end:%Y-%m-%d %H:%M} UTC; data setelahnya hilang. "
+            "Jalankan Manual Sync atau Backfill Histori agar prediksi memakai data terbaru."
+        )
 
     if req.custom_features:
         for k, v in req.custom_features.items():

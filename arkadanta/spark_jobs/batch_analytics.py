@@ -11,11 +11,17 @@ if str(ROOT_DIR) not in sys.path:
 from backend.config import DROP_ZONE_DIR
 from backend.schemas import DynamicConfig
 from data.storage import load_clean_ohlcv
+from spark_jobs.locks import exclusive_spark
 from spark_jobs.train_models import collect_model_features
 from backend.ml.model_trainer import train_from_features
 
 
 def prepare_spark_features(config: DynamicConfig):
+    with exclusive_spark():
+        return _prepare_spark_features(config)
+
+
+def _prepare_spark_features(config: DynamicConfig):
     from pyspark.sql import SparkSession, functions as F
     from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
     from spark_jobs.feature_pipeline import spark_compute_features

@@ -548,6 +548,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                   <h5 className="bd-card-category">
                     Regression MAE: {metrics.regression_metrics.mae} | RMSE:{' '}
                     {metrics.regression_metrics.rmse}
+                    {metrics.baseline_metrics && ` (naif: ${metrics.baseline_metrics.persistence_rmse})`}
                   </h5>
                   <h4 className="bd-card-title !text-base flex items-center gap-2">
                     <Cpu className="w-4 h-4 text-[#1d8cf8]" />
@@ -602,6 +603,10 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                   <h5 className="bd-card-category">
                     Chronological Out-of-Sample Evaluation (Accuracy:{' '}
                     {(metrics.classification_metrics.accuracy * 100).toFixed(2)}%)
+                    {metrics.baseline_metrics && (
+                      <> · naif: kelas terbanyak {(metrics.baseline_metrics.majority_accuracy * 100).toFixed(1)}%,
+                        tetap sama {(metrics.baseline_metrics.persistence_accuracy * 100).toFixed(1)}%</>
+                    )}
                   </h5>
                   <h4 className="bd-card-title !text-base">
                     Per-Class Precision, Recall &amp; F1-Score

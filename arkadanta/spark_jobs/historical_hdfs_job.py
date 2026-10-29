@@ -20,6 +20,7 @@ from backend.config import (
 )
 from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
 from spark_jobs.feature_pipeline import spark_compute_features
+from spark_jobs.locks import exclusive_spark
 from spark_jobs.train_models import spark_train_and_evaluate
 from backend.ml.model_trainer import bundle_path
 from backend.schemas import DynamicConfig
@@ -172,6 +173,11 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
 
 def run_historical_hdfs_job(config: DynamicConfig, input_path: str | None = None) -> dict:
     """Batch layer: HDFS -> Spark fitur -> GMM/HGB yang sama dengan Model Lab, lalu dipakai serving layer."""
+    with exclusive_spark():
+        return _run_historical_hdfs_job(config, input_path)
+
+
+def _run_historical_hdfs_job(config: DynamicConfig, input_path: str | None) -> dict:
     symbol, timeframe = config.symbol.upper(), config.timeframe
     start_date, end_date = config.start_date, config.end_date
     now = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)

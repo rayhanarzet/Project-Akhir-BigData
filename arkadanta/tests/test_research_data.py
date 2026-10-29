@@ -126,6 +126,24 @@ class ResearchDataTests(unittest.TestCase):
         self.assertEqual(len(storage.load_clean_ohlcv("BTCUSDT")), 1005)
         self.assertEqual(reports[0]["rows_after"], 1005)
 
+    def test_fill_gap_fetches_only_candles_after_last_saved(self):
+        def kline(open_ms):
+            return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + 299_999, "15", 3, "4", "6", "0"]
+
+        self.assertEqual(self.worker.fill_gap("BTCUSDT"), 0)  # belum ada histori: tidak menyentuh jaringan
+        last = 1_700_000_000_000
+        page = Mock()
+        page.json.return_value = [kline(last), kline(last + 300_000)]
+        with patch.object(scheduler.requests, "get", return_value=page):
+            self.worker.backfill(["BTCUSDT"], days=1)
+        gap = Mock()
+        gap.json.return_value = [kline(last + i * 300_000) for i in range(2, 5)]
+        with patch.object(scheduler.requests, "get", return_value=gap) as get:
+            added = self.worker.fill_gap("BTCUSDT")
+        self.assertEqual(get.call_args.kwargs["params"]["startTime"], last + 2 * 300_000)
+        self.assertEqual(added, 3)
+        self.assertEqual(len(storage.load_clean_ohlcv("BTCUSDT")), 5)
+
     def test_data_error_is_returned_as_actionable_json(self):
         response = asyncio.run(research_data_error_handler(None, storage.ResearchDataError("Data belum tersedia")))
         self.assertEqual(response.status_code, 409)

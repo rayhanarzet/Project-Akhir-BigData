@@ -54,7 +54,7 @@ class ModelMigrationTests(unittest.TestCase):
         self.assertIsInstance(bundle['regressor'], HistGradientBoostingRegressor)
         self.assertFalse(bundle['classifier'].early_stopping)
         self.assertEqual(legacy.read_bytes(), b'legacy artifact must not be read or replaced')
-        self.assertEqual(metrics['model_version'], 'gmm_hgb_v1')
+        self.assertEqual(metrics['model_version'], 'gmm_hgb_v2')
         self.assertTrue(metrics['gmm_metrics']['converged'])
         self.assertTrue(np.isfinite(metrics['gmm_metrics']['bic']))
         self.assertTrue(np.isfinite(metrics['gmm_metrics']['aic']))
@@ -74,7 +74,7 @@ class ModelMigrationTests(unittest.TestCase):
         self.assertIn(result['predicted_regime_t_plus_1'], {'SAFE', 'WARNING', 'DANGER'})
         self.assertIn('current_component_id', result)
         self.assertGreaterEqual(result['predicted_volatility_pct'], 0)
-        self.assertEqual(model_predictor.get_latest_metrics('BTCUSDT', '5m')['model_version'], 'gmm_hgb_v1')
+        self.assertEqual(model_predictor.get_latest_metrics('BTCUSDT', '5m')['model_version'], 'gmm_hgb_v2')
 
     def test_future_holdout_changes_do_not_change_fitted_models(self):
         config = self.config.model_copy(update={'target_horizon': 3})
@@ -127,13 +127,13 @@ class ModelMigrationTests(unittest.TestCase):
             collect_model_features(frame)
         frame.limit.assert_called_once_with(MAX_DRIVER_ROWS + 1)
 
-    def test_spark_preparation_is_reused_for_inference(self):
+    def test_spark_trained_model_is_served_without_starting_spark(self):
         config = self.config.model_copy(update={'use_spark': True})
         features = compute_dynamic_features(aggregate_timeframe(self.raw, '5m'), ma_period=7, rsi_period=9, rolling_window=11)
         with patch('spark_jobs.batch_analytics.prepare_spark_features', return_value=features) as prepare:
             result = model_trainer.train_dynamic_models(config)
             prediction = model_predictor.predict_next_period(PredictRequest(timeframe='5m'))
-        self.assertEqual(prepare.call_count, 2)
+        self.assertEqual(prepare.call_count, 1)
         self.assertIn('driver', result['execution_engine'])
         self.assertIn('current_component_id', prediction)
 

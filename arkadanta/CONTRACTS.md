@@ -2,7 +2,7 @@
 
 Dokumen ini mendefinisikan titik temu (data, skema, dan API) antara **Orang 1 (Data Pipeline & Big Data)** dan **Orang 2 (Analytics, Machine Learning & Dashboard)**.
 
-**Revisi ML:** label risiko memakai GaussianMixture; prediksi memakai HistGradientBoostingClassifier/Regressor. Konfigurasi: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`. Respons metrik: `gmm_metrics` (silhouette nullable, BIC, AIC, mean komponen); respons prediksi: `current_component_id`. Model lama tidak dibaca, artefak baru berada di `data/research/models/gmm_hgb_v1/`. Spark memproses fitur; training GMM/HGB berlangsung di driver lokal dengan batas 500.000 baris.
+**Revisi ML:** label risiko memakai GaussianMixture; prediksi memakai HistGradientBoostingClassifier/Regressor. Konfigurasi: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`. Respons metrik: `gmm_metrics` (silhouette nullable, BIC, AIC, mean komponen); respons prediksi: `current_component_id`. Model lama tidak dibaca, artefak baru berada di `data/research/models/gmm_hgb_v2/`. Spark memproses fitur; training GMM/HGB berlangsung di driver lokal dengan batas 500.000 baris.
 
 ---
 
@@ -64,7 +64,7 @@ Endpoint `POST /api/ingestion/upload` dan `POST /api/ingestion/live-sync` mengem
   },
   "drop_zone_path": "data/drop_zone/BTCUSDT_clean.csv",
   "hdfs_target_path": "/user/arkadanta/data/clean/crypto/symbol=BTCUSDT/",
-  "nifi_hdfs_status": "SYNCED",
+  "nifi_hdfs_status": "QUEUED_DROP_ZONE",
   "quality_score_pct": 98.8
 }
 ```

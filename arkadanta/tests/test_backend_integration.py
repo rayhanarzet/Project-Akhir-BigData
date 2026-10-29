@@ -10,10 +10,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from backend.analytics.anomaly_detector import detect_anomalies
-from backend.analytics.correlation_analyzer import (
-    analyze_cross_asset_correlation,
-    compute_historical_factor_attribution,
-)
+from backend.analytics.correlation_analyzer import compute_historical_factor_attribution
 from backend.analytics.feature_engineering import compute_dynamic_features
 from backend.analytics.timeframe_aggregator import aggregate_timeframe
 from backend.ingestion.dynamic_pipeline import run_dynamic_ingestion_pipeline
@@ -43,17 +40,21 @@ def test_multi_symbol_ingestion_and_audit():
 
 
 def test_raw_binance_vision_headerless_csv():
-    raw_path = BASE_DIR / "data" / "raw" / "BTCUSDT-5m-2025-01.csv"
-    if raw_path.exists():
-        sample_lines = b"\n".join(raw_path.read_bytes().splitlines()[:25])
-        df_clean, report = run_dynamic_ingestion_pipeline(
-            filename="BTCUSDT-5m-2025-01.csv",
-            content=sample_lines,
-            default_symbol="BTCUSDT",
-        )
-        assert len(df_clean) == 25
-        assert report.quality_score_pct == 100.0
-        assert df_clean["timestamp"].iloc[0].year == 2025
+    # Format ekspor data.binance.vision: 12 kolom tanpa header, open_time dalam milidetik.
+    start = 1735689600000  # 2025-01-01 00:00 UTC
+    sample_lines = "\n".join(
+        f"{start + i * 300_000},100,102,99,101,10,{start + i * 300_000 + 299_999},1010,25,4,404,0"
+        for i in range(25)
+    ).encode()
+    df_clean, report = run_dynamic_ingestion_pipeline(
+        filename="BTCUSDT-5m-2025-01.csv",
+        content=sample_lines,
+        default_symbol="BTCUSDT",
+    )
+    assert len(df_clean) == 25
+    assert report.quality_score_pct == 100.0
+    assert df_clean["timestamp"].iloc[0] == pd.Timestamp("2025-01-01", tz="UTC")
+    assert df_clean["taker_buy_base_volume"].iloc[0] == 4
 
 
 def test_analytics_ml_and_component_risk_ordering():

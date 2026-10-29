@@ -10,7 +10,9 @@ import pandas as pd
 from backend.config import BINANCE_KLINES_URL, DEFAULT_SYMBOLS, DROP_ZONE_DIR, HDFS_BASE_PATH
 from backend.schemas import IngestionAuditReport
 from data.storage import (
+    ResearchDataError,
     append_audit_logs,
+    load_clean_ohlcv,
     save_clean_ohlcv,
 )
 import uuid
@@ -51,6 +53,21 @@ def _fetch_closed_klines(symbol: str, limit: int, start_time_ms: Optional[int] =
         if int(k[6]) < now_ms
     ]
     return pd.DataFrame(rows)
+
+
+def _fetch_since(symbol: str, start_time_ms: int) -> pd.DataFrame:
+    """Semua candle 5m selesai sejak start_time_ms, per halaman 1000 (batas Binance)."""
+    pages = []
+    while True:
+        page = _fetch_closed_klines(symbol, 1000, start_time_ms=start_time_ms)
+        if page.empty:
+            break
+        pages.append(page)
+        start_time_ms = int(page["timestamp"].iloc[-1].value // 1_000_000) + FIVE_MINUTES_MS
+        if len(page) < 1000:
+            break
+        time.sleep(0.2)  # di bawah batas bobot Binance (6000/menit)
+    return pd.concat(pages, ignore_index=True) if pages else pd.DataFrame()
 
 
 class BinanceCronScheduler:
@@ -130,20 +147,9 @@ class BinanceCronScheduler:
             reports = []
             for sym in symbols:
                 symbol = sym.upper()
-                cursor = int((time.time() - days * 86400) * 1000)
-                pages = []
-                while True:
-                    page = _fetch_closed_klines(symbol, 1000, start_time_ms=cursor)
-                    if page.empty:
-                        break
-                    pages.append(page)
-                    cursor = int(page["timestamp"].iloc[-1].value // 1_000_000) + FIVE_MINUTES_MS
-                    if len(page) < 1000:
-                        break
-                    time.sleep(0.2)  # di bawah batas bobot Binance (6000/menit)
-                if not pages:
+                frame = _fetch_since(symbol, int((time.time() - days * 86400) * 1000))
+                if frame.empty:
                     raise ValueError(f"Binance tidak mengembalikan histori untuk {symbol}")
-                frame = pd.concat(pages, ignore_index=True)
                 rows_before, rows_after = save_clean_ohlcv(symbol, frame)
                 reports.append(IngestionAuditReport(
                     run_id=f"backfill_{uuid.uuid4().hex[:8]}",
@@ -163,6 +169,18 @@ class BinanceCronScheduler:
                 # Simpan audit per aset agar aset yang sudah selesai tetap tercatat bila aset berikutnya gagal.
                 append_audit_logs(reports[-1:])
             return reports
+
+    def fill_gap(self, symbol: str) -> int:
+        """Menarik candle yang terlewat sejak candle terakhir tersimpan (mis. laptop/backend mati)."""
+        with self._sync_lock:
+            try:
+                last = load_clean_ohlcv(symbol)["timestamp"].max()
+            except ResearchDataError:
+                return 0  # belum ada histori sama sekali: itu tugas Backfill Histori, bukan pengisian celah
+            frame = _fetch_since(symbol, int(last.value // 1_000_000) + FIVE_MINUTES_MS)
+            if not frame.empty:
+                save_clean_ohlcv(symbol, frame)
+            return len(frame)
 
     def _trigger_sync(self, symbols: Optional[List[str]], limit: Optional[int]) -> List[Dict[str, Any]]:
         """Mengeksekusi penarikan data Binance untuk simbol terpilih (dapat dipanggil cron atau manual)."""

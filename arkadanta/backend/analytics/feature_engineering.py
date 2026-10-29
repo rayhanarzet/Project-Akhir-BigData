@@ -52,11 +52,13 @@ def compute_dynamic_features(
         g["sma_20"] = g["close"].rolling(window=ma_period, min_periods=1).mean()
         g["ema_20"] = g["close"].ewm(span=ma_period, adjust=False).mean()
 
-        delta = g["close"].diff()
+        # RSI rata-rata sederhana (Cutler), sama persis dengan spark_compute_features agar model
+        # yang dilatih dari fitur Spark menerima skala fitur yang sama saat prediksi pandas.
+        delta = g["close"].diff().fillna(0.0)
         gain = delta.clip(lower=0.0)
         loss = -delta.clip(upper=0.0)
-        avg_gain = gain.ewm(alpha=1.0 / rsi_period, min_periods=1, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1.0 / rsi_period, min_periods=1, adjust=False).mean()
+        avg_gain = gain.rolling(window=rsi_period, min_periods=1).mean()
+        avg_loss = loss.rolling(window=rsi_period, min_periods=1).mean()
         rs = avg_gain / np.maximum(avg_loss, 1e-8)
         g["rsi_14"] = 100.0 - (100.0 / (1.0 + rs))
         g["rsi_14"] = g["rsi_14"].fillna(50.0)

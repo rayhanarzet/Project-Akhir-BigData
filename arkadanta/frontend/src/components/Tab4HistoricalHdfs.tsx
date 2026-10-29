@@ -22,7 +22,7 @@ export const Tab4HistoricalHdfs: React.FC = () => {
   yearAgo.setUTCDate(yearAgo.getUTCDate() - 364);
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState<Timeframe>('1h');
-  const [source, setSource] = useState<'raw' | 'clean'>('raw');
+  const [source, setSource] = useState<'raw' | 'clean'>('clean');
   const [startDate, setStartDate] = useState(dateInput(yearAgo));
   const [endDate, setEndDate] = useState(dateInput(today));
   const [result, setResult] = useState<HistoricalHdfsRunResponse | null>(null);
