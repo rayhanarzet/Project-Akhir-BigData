@@ -1,0 +1,684 @@
+{
+  "model_version": "gmm_hgb_v1",
+  "trained_at": "2026-10-27T14:38:36.720221+00:00",
+  "execution_engine": "Pandas + Scikit-Learn GMM/HGB",
+  "algorithms": {
+    "labeler": "GaussianMixture",
+    "classifier": "HistGradientBoostingClassifier",
+    "regressor": "HistGradientBoostingRegressor"
+  },
+  "symbol": "BTCUSDT",
+  "timeframe": "1h",
+  "target_horizon": 1,
+  "features": [
+    "max_volatility",
+    "spike_ratio",
+    "rsi_14",
+    "volume_zscore",
+    "bb_width",
+    "hl_range"
+  ],
+  "gmm_components": 3,
+  "train_ratio": 0.8,
+  "gb_max_iter": 200,
+  "gb_max_depth": 10,
+  "gb_learning_rate": 0.1,
+  "temporal_split": {
+    "total_samples": 8759,
+    "train_samples": 7006,
+    "test_samples": 1752,
+    "embargo_samples": 1,
+    "train_start": "2025-10-27 14:00:00+00:00",
+    "train_end": "2026-08-15 11:00:00+00:00",
+    "train_target_end": "2026-08-15 12:00:00+00:00",
+    "labeler_fit_end": "2026-08-15 12:00:00+00:00",
+    "test_start": "2026-08-15 13:00:00+00:00",
+    "test_end": "2026-10-27 12:00:00+00:00",
+    "deployed_model_fit_samples": 8759
+  },
+  "gmm_metrics": {
+    "silhouette_score": 0.1978,
+    "bic": 23209.673827020713,
+    "aic": 22640.736637965958,
+    "converged": true,
+    "cluster_to_label": {
+      "0": "SAFE",
+      "1": "WARNING",
+      "2": "DANGER"
+    },
+    "centroids": [
+      {
+        "cluster_id": 0,
+        "risk_rank": 1,
+        "assigned_risk_label": "SAFE",
+        "composite_risk_score": -0.4372,
+        "train_sample_count": 3236,
+        "mixture_weight": 0.432969,
+        "centroid_max_volatility": 0.003948,
+        "z_max_volatility": -0.5124,
+        "centroid_spike_ratio": 0.793457,
+        "z_spike_ratio": -0.3589,
+        "centroid_rsi_14": 51.051436,
+        "z_rsi_14": 0.1515,
+        "centroid_volume_zscore": -0.434991,
+        "z_volume_zscore": -0.4272,
+        "centroid_bb_width": 0.016881,
+        "z_bb_width": -0.5931,
+        "centroid_hl_range": 0.003948,
+        "z_hl_range": -0.5124
+      },
+      {
+        "cluster_id": 1,
+        "risk_rank": 2,
+        "assigned_risk_label": "WARNING",
+        "composite_risk_score": -0.0208,
+        "train_sample_count": 2079,
+        "mixture_weight": 0.315351,
+        "centroid_max_volatility": 0.006063,
+        "z_max_volatility": -0.0936,
+        "centroid_spike_ratio": 0.755297,
+        "z_spike_ratio": -0.4192,
+        "centroid_rsi_14": 47.617714,
+        "z_rsi_14": -0.1336,
+        "centroid_volume_zscore": -0.442043,
+        "z_volume_zscore": -0.4337,
+        "centroid_bb_width": 0.042997,
+        "z_bb_width": 0.7122,
+        "centroid_hl_range": 0.006063,
+        "z_hl_range": -0.0936
+      },
+      {
+        "cluster_id": 2,
+        "risk_rank": 3,
+        "assigned_risk_label": "DANGER",
+        "composite_risk_score": 0.8199,
+        "train_sample_count": 1692,
+        "mixture_weight": 0.25168,
+        "centroid_max_volatility": 0.011579,
+        "z_max_volatility": 0.9989,
+        "centroid_spike_ratio": 1.742657,
+        "z_spike_ratio": 1.1426,
+        "centroid_rsi_14": 48.101997,
+        "z_rsi_14": -0.0934,
+        "centroid_volume_zscore": 1.408623,
+        "z_volume_zscore": 1.2784,
+        "centroid_bb_width": 0.031306,
+        "z_bb_width": 0.1279,
+        "centroid_hl_range": 0.011579,
+        "z_hl_range": 0.9989
+      }
+    ],
+    "regime_distribution": {
+      "SAFE": 4216,
+      "WARNING": 2438,
+      "DANGER": 2106
+    }
+  },
+  "classification_metrics": {
+    "accuracy": 0.7477,
+    "precision_macro": 0.7065,
+    "recall_macro": 0.6994,
+    "f1_macro": 0.701,
+    "per_class": {
+      "SAFE": {
+        "precision": 0.8063,
+        "recall": 0.859,
+        "f1_score": 0.8318,
+        "support": 979
+      },
+      "WARNING": {
+        "precision": 0.7778,
+        "recall": 0.7994,
+        "f1_score": 0.7885,
+        "support": 359
+      },
+      "DANGER": {
+        "precision": 0.5353,
+        "recall": 0.4396,
+        "f1_score": 0.4828,
+        "support": 414
+      }
+    },
+    "labels": [
+      "SAFE",
+      "WARNING",
+      "DANGER"
+    ],
+    "confusion_matrix": [
+      [
+        841,
+        30,
+        108
+      ],
+      [
+        22,
+        287,
+        50
+      ],
+      [
+        180,
+        52,
+        182
+      ]
+    ]
+  },
+  "regression_metrics": {
+    "mae": 0.00226,
+    "rmse": 0.003617
+  },
+  "feature_importance_method": "permutation_f1_macro_holdout",
+  "feature_importances": [
+    {
+      "feature": "bb_width",
+      "importance": 0.254039,
+      "std": 0.014103
+    },
+    {
+      "feature": "volume_zscore",
+      "importance": 0.106802,
+      "std": 0.005585
+    },
+    {
+      "feature": "max_volatility",
+      "importance": 0.102469,
+      "std": 0.007634
+    },
+    {
+      "feature": "spike_ratio",
+      "importance": 0.073687,
+      "std": 0.011775
+    },
+    {
+      "feature": "rsi_14",
+      "importance": 0.066539,
+      "std": 0.003016
+    },
+    {
+      "feature": "hl_range",
+      "importance": 0.0,
+      "std": 0.0
+    }
+  ],
+  "test_predictions_preview": [
+    {
+      "timestamp": "2026-10-25 01:00:00+00:00",
+      "close": 80902.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002312,
+      "predicted_vol_t1": 0.002357
+    },
+    {
+      "timestamp": "2026-10-25 02:00:00+00:00",
+      "close": 80920.0,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002173,
+      "predicted_vol_t1": 0.004069
+    },
+    {
+      "timestamp": "2026-10-25 03:00:00+00:00",
+      "close": 80862.98,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.001658,
+      "predicted_vol_t1": 0.003361
+    },
+    {
+      "timestamp": "2026-10-25 04:00:00+00:00",
+      "close": 80923.19,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005217,
+      "predicted_vol_t1": 0.002333
+    },
+    {
+      "timestamp": "2026-10-25 05:00:00+00:00",
+      "close": 80607.65,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003012,
+      "predicted_vol_t1": 0.004963
+    },
+    {
+      "timestamp": "2026-10-25 06:00:00+00:00",
+      "close": 80496.0,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002753,
+      "predicted_vol_t1": 0.003394
+    },
+    {
+      "timestamp": "2026-10-25 07:00:00+00:00",
+      "close": 80672.83,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004044,
+      "predicted_vol_t1": 0.003663
+    },
+    {
+      "timestamp": "2026-10-25 08:00:00+00:00",
+      "close": 80404.96,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004524,
+      "predicted_vol_t1": 0.005326
+    },
+    {
+      "timestamp": "2026-10-25 09:00:00+00:00",
+      "close": 80328.32,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002607,
+      "predicted_vol_t1": 0.006354
+    },
+    {
+      "timestamp": "2026-10-25 10:00:00+00:00",
+      "close": 80281.07,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004375,
+      "predicted_vol_t1": 0.004024
+    },
+    {
+      "timestamp": "2026-10-25 11:00:00+00:00",
+      "close": 80580.97,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.003326,
+      "predicted_vol_t1": 0.006026
+    },
+    {
+      "timestamp": "2026-10-25 12:00:00+00:00",
+      "close": 80454.0,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002808,
+      "predicted_vol_t1": 0.004619
+    },
+    {
+      "timestamp": "2026-10-25 13:00:00+00:00",
+      "close": 80386.09,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004427,
+      "predicted_vol_t1": 0.003425
+    },
+    {
+      "timestamp": "2026-10-25 14:00:00+00:00",
+      "close": 80649.99,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003252,
+      "predicted_vol_t1": 0.004221
+    },
+    {
+      "timestamp": "2026-10-25 15:00:00+00:00",
+      "close": 80636.11,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003963,
+      "predicted_vol_t1": 0.003748
+    },
+    {
+      "timestamp": "2026-10-25 16:00:00+00:00",
+      "close": 80806.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002571,
+      "predicted_vol_t1": 0.004086
+    },
+    {
+      "timestamp": "2026-10-25 17:00:00+00:00",
+      "close": 80796.0,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002093,
+      "predicted_vol_t1": 0.003212
+    },
+    {
+      "timestamp": "2026-10-25 18:00:00+00:00",
+      "close": 80666.69,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.00166,
+      "predicted_vol_t1": 0.002705
+    },
+    {
+      "timestamp": "2026-10-25 19:00:00+00:00",
+      "close": 80567.47,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002363,
+      "predicted_vol_t1": 0.00227
+    },
+    {
+      "timestamp": "2026-10-25 20:00:00+00:00",
+      "close": 80492.85,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004127,
+      "predicted_vol_t1": 0.003464
+    },
+    {
+      "timestamp": "2026-10-25 21:00:00+00:00",
+      "close": 80276.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.006007,
+      "predicted_vol_t1": 0.004043
+    },
+    {
+      "timestamp": "2026-10-25 22:00:00+00:00",
+      "close": 80465.34,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.007927,
+      "predicted_vol_t1": 0.004229
+    },
+    {
+      "timestamp": "2026-10-25 23:00:00+00:00",
+      "close": 80154.09,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.006083,
+      "predicted_vol_t1": 0.008065
+    },
+    {
+      "timestamp": "2026-10-26 00:00:00+00:00",
+      "close": 80168.0,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.011128,
+      "predicted_vol_t1": 0.005009
+    },
+    {
+      "timestamp": "2026-10-26 01:00:00+00:00",
+      "close": 79756.51,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.006209,
+      "predicted_vol_t1": 0.004887
+    },
+    {
+      "timestamp": "2026-10-26 02:00:00+00:00",
+      "close": 79580.52,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.005838,
+      "predicted_vol_t1": 0.006305
+    },
+    {
+      "timestamp": "2026-10-26 03:00:00+00:00",
+      "close": 79598.02,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.007163,
+      "predicted_vol_t1": 0.005305
+    },
+    {
+      "timestamp": "2026-10-26 04:00:00+00:00",
+      "close": 80134.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.002847,
+      "predicted_vol_t1": 0.006247
+    },
+    {
+      "timestamp": "2026-10-26 05:00:00+00:00",
+      "close": 80263.32,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004127,
+      "predicted_vol_t1": 0.003852
+    },
+    {
+      "timestamp": "2026-10-26 06:00:00+00:00",
+      "close": 80130.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003467,
+      "predicted_vol_t1": 0.005348
+    },
+    {
+      "timestamp": "2026-10-26 07:00:00+00:00",
+      "close": 80046.71,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.009349,
+      "predicted_vol_t1": 0.004721
+    },
+    {
+      "timestamp": "2026-10-26 08:00:00+00:00",
+      "close": 80235.14,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004835,
+      "predicted_vol_t1": 0.008925
+    },
+    {
+      "timestamp": "2026-10-26 09:00:00+00:00",
+      "close": 80538.53,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002097,
+      "predicted_vol_t1": 0.006441
+    },
+    {
+      "timestamp": "2026-10-26 10:00:00+00:00",
+      "close": 80370.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003704,
+      "predicted_vol_t1": 0.003305
+    },
+    {
+      "timestamp": "2026-10-26 11:00:00+00:00",
+      "close": 80416.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003476,
+      "predicted_vol_t1": 0.005712
+    },
+    {
+      "timestamp": "2026-10-26 12:00:00+00:00",
+      "close": 80332.71,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.011093,
+      "predicted_vol_t1": 0.004823
+    },
+    {
+      "timestamp": "2026-10-26 13:00:00+00:00",
+      "close": 79702.63,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.010557,
+      "predicted_vol_t1": 0.011067
+    },
+    {
+      "timestamp": "2026-10-26 14:00:00+00:00",
+      "close": 80411.37,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.006007,
+      "predicted_vol_t1": 0.009341
+    },
+    {
+      "timestamp": "2026-10-26 15:00:00+00:00",
+      "close": 80427.69,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.008368,
+      "predicted_vol_t1": 0.007031
+    },
+    {
+      "timestamp": "2026-10-26 16:00:00+00:00",
+      "close": 80236.25,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005146,
+      "predicted_vol_t1": 0.009715
+    },
+    {
+      "timestamp": "2026-10-26 17:00:00+00:00",
+      "close": 80334.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005379,
+      "predicted_vol_t1": 0.005835
+    },
+    {
+      "timestamp": "2026-10-26 18:00:00+00:00",
+      "close": 79992.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002818,
+      "predicted_vol_t1": 0.004682
+    },
+    {
+      "timestamp": "2026-10-26 19:00:00+00:00",
+      "close": 80020.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002576,
+      "predicted_vol_t1": 0.003564
+    },
+    {
+      "timestamp": "2026-10-26 20:00:00+00:00",
+      "close": 79864.94,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004339,
+      "predicted_vol_t1": 0.003806
+    },
+    {
+      "timestamp": "2026-10-26 21:00:00+00:00",
+      "close": 80105.24,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.00285,
+      "predicted_vol_t1": 0.004938
+    },
+    {
+      "timestamp": "2026-10-26 22:00:00+00:00",
+      "close": 80001.86,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005795,
+      "predicted_vol_t1": 0.004057
+    },
+    {
+      "timestamp": "2026-10-26 23:00:00+00:00",
+      "close": 80150.56,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003204,
+      "predicted_vol_t1": 0.004685
+    },
+    {
+      "timestamp": "2026-10-27 00:00:00+00:00",
+      "close": 80223.79,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004329,
+      "predicted_vol_t1": 0.004256
+    },
+    {
+      "timestamp": "2026-10-27 01:00:00+00:00",
+      "close": 80071.43,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.004594,
+      "predicted_vol_t1": 0.005309
+    },
+    {
+      "timestamp": "2026-10-27 02:00:00+00:00",
+      "close": 79818.02,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003601,
+      "predicted_vol_t1": 0.005959
+    },
+    {
+      "timestamp": "2026-10-27 03:00:00+00:00",
+      "close": 79819.56,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002619,
+      "predicted_vol_t1": 0.005094
+    },
+    {
+      "timestamp": "2026-10-27 04:00:00+00:00",
+      "close": 79759.26,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.00414,
+      "predicted_vol_t1": 0.003886
+    },
+    {
+      "timestamp": "2026-10-27 05:00:00+00:00",
+      "close": 79976.8,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005609,
+      "predicted_vol_t1": 0.004875
+    },
+    {
+      "timestamp": "2026-10-27 06:00:00+00:00",
+      "close": 79669.99,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.005451,
+      "predicted_vol_t1": 0.004364
+    },
+    {
+      "timestamp": "2026-10-27 07:00:00+00:00",
+      "close": 79806.72,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002842,
+      "predicted_vol_t1": 0.005822
+    },
+    {
+      "timestamp": "2026-10-27 08:00:00+00:00",
+      "close": 79871.15,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.002899,
+      "predicted_vol_t1": 0.004202
+    },
+    {
+      "timestamp": "2026-10-27 09:00:00+00:00",
+      "close": 79776.99,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.008256,
+      "predicted_vol_t1": 0.003941
+    },
+    {
+      "timestamp": "2026-10-27 10:00:00+00:00",
+      "close": 79968.01,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.003696,
+      "predicted_vol_t1": 0.00736
+    },
+    {
+      "timestamp": "2026-10-27 11:00:00+00:00",
+      "close": 79910.01,
+      "actual_risk_t1": "DANGER",
+      "predicted_risk_t1": "SAFE",
+      "actual_vol_t1": 0.008194,
+      "predicted_vol_t1": 0.004918
+    },
+    {
+      "timestamp": "2026-10-27 12:00:00+00:00",
+      "close": 80365.66,
+      "actual_risk_t1": "SAFE",
+      "predicted_risk_t1": "DANGER",
+      "actual_vol_t1": 0.005694,
+      "predicted_vol_t1": 0.006509
+    }
+  ]
+}
