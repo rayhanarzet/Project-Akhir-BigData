@@ -57,7 +57,7 @@ DEFAULT_FEATURES = [
 ]
 
 HDFS_BASE_PATH = os.getenv(
-    "ARKADANTA_HDFS_PATH", "/user/arkadanta/data/clean/crypto/"
+    "ARKADANTA_HDFS_PATH", "/user/arkadanta/data/clean/crypto/v3/"
 )
 HISTORICAL_HDFS_URI = os.getenv(
     "ARKADANTA_HISTORICAL_HDFS_URI", "hdfs://127.0.0.1:9000"

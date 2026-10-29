@@ -678,7 +678,7 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig, dataR
                   Market Risk Index
                 </span>
                 <span className="text-sm font-mono font-semibold text-[#ff8d72]">
-                  {correlation.market_wide_risk_score} / 100 ({correlation.market_wide_regime})
+                  {correlation.market_wide_risk_score === null ? 'Data serempak belum cukup / belum terbaru' : `${correlation.market_wide_risk_score} / 100 (${correlation.market_wide_regime})`}
                 </span>
               </div>
             )}
@@ -702,19 +702,20 @@ export const Tab2AnalyticsBI: React.FC<Props> = ({ config, onChangeConfig, dataR
                       <tr key={rSym}>
                         <td className="font-medium text-white">{rSym}</td>
                         {correlation.symbols.map((cSym) => {
-                          const val = correlation.pearson_matrix[rSym]?.[cSym] ?? 0;
+                          const val = correlation.pearson_matrix[rSym]?.[cSym];
                           return (
                             <td
                               key={cSym}
+                              title={`${correlation.paired_observations[rSym]?.[cSym] ?? 0} pasangan timestamp nyata`}
                               className={`text-right font-mono ${
-                                val >= 0.8
+                                val != null && val >= 0.8
                                   ? 'text-[#00f2c3]'
-                                  : val >= 0.6
+                                  : val != null && val >= 0.6
                                   ? 'text-[#1d8cf8]'
                                   : 'text-[#9a9a9a]'
                               }`}
                             >
-                              {val.toFixed(3)}
+                              {val == null ? '—' : val.toFixed(3)}
                             </td>
                           );
                         })}

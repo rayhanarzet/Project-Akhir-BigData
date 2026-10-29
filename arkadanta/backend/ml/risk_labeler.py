@@ -50,6 +50,12 @@ class DynamicRiskLabeler:
         total_w = 0.0
         for idx, w in weights:
             col_name = feature_cols[idx]
+            if col_name == "rsi_14" and hasattr(self.scaler, "mean_"):
+                actual_rsi = float(centroid_z[idx]) * self.scaler.scale_[idx] + self.scaler.mean_[idx]
+                val = abs(actual_rsi - 50.0) / 50.0
+                score += val * w
+                total_w += w
+                continue
             val = (
                 abs(float(centroid_z[idx]))
                 if col_name in ("rsi_14", "log_return", "periodic_return", "co_change")

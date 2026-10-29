@@ -64,7 +64,7 @@
                        ┌─────────────────▼─────────────────┐
                        │   INGESTION (backend/ingestion/)  │
                        │ deteksi format → mapping kolom →  │
-                       │ validasi → dedup → imputasi →     │
+                       │ validasi → tolak invalid → dedup │
                        │ sanity check → laporan audit      │
                        └─────────────────┬─────────────────┘
                                          │
@@ -148,14 +148,14 @@ Langkah-langkahnya:
 4. **Normalisasi timestamp ke UTC.** Epoch otomatis dikenali satuannya (detik, milidetik, mikrodetik, nanodetik) dari besarnya angka. Timestamp yang tidak bisa dibaca dibuang dan dicatat sebagai `invalid_timestamp`.
 5. **Konversi numerik** untuk harga dan volume.
 6. **Deduplikasi** berdasarkan `(coin_symbol, timestamp)`; yang terakhir dipertahankan.
-7. **Imputasi:** OHLC yang kosong diisi *forward-fill* per aset; volume kosong diisi `0`.
+7. **Nilai kosong:** OHLCV kosong ditolak; nilai penelitian tidak diisi dengan tebakan. Semua angka wajib finite, candle pada grid 5m, dan sudah selesai.
 8. **Sanity check.** Baris ditolak jika:
    - `high < low`, atau `high` lebih kecil dari open/close, atau `low` lebih besar dari open/close;
    - ada harga `<= 0`;
    - volume negatif.
 9. **Simpan per simbol** ke `data/research/drop_zone/{SYMBOL}_5m_clean.csv`.
-10. **Sinkron ke HDFS (opsional):** hanya jika env `ARKADANTA_ENABLE_HDFS=1` dan perintah `hdfs` tersedia. Statusnya `SYNCED`, `QUEUED_DROP_ZONE`, atau `LOCAL_FALLBACK`.
-11. **Laporan audit** (`IngestionAuditReport`) disimpan ke `audit_logs.json`. Isinya antara lain: jumlah baris sebelum/sesudah, duplikat dibuang, baris diimputasi, baris ditolak beserta alasannya, dan `quality_score_pct = rows_after / rows_before × 100`.
+10. **Pengiriman HDFS:** jurnal `.pending` ditulis sebelum update CSV dan outbox. NiFi mengambil `nifi_outbox/v3/`, lalu PutHDFS mengirim ke partisi v3. Status antrean `QUEUED_DROP_ZONE` tidak membuktikan delivery. Replay aman dengan PutHDFS `ignore`; koreksi candle memiliki `ingestion_version` yang lebih besar.
+11. **Laporan audit** disimpan lengkap ke `audit_logs.jsonl`; `audit_logs.json` menjadi snapshot 50 catatan terbaru untuk kompatibilitas. Laporan upload juga mencatat hash SHA-256 sumber, jumlah baris ditolak beserta alasan, dan `quality_score_pct = rows_after / rows_before × 100`.
 
 ### 5.2 Binance WebSocket live (panel Live Market)
 
@@ -183,8 +183,9 @@ File: `data/storage.py`. Lokasi dasar: `arkadanta/data/research/` (diatur di `ba
 | Path | Isi |
 |---|---|
 | `data/research/drop_zone/{SYMBOL}_5m_clean.csv` | Dataset bersih 5 menit per simbol |
-| `data/research/audit_logs.json` | Riwayat laporan audit ingestion |
-| `data/research/models/gmm_hgb_v1/` | Model terlatih (`.joblib`) dan metrik (`.json`) |
+| `data/research/audit_logs.jsonl` | Riwayat lengkap laporan audit ingestion |
+| `data/research/audit_logs.json` | Snapshot 50 catatan audit terbaru |
+| `data/research/models/gmm_hgb_v3/` | Model terlatih (`.joblib`) dan metrik (`.json`) |
 | `data/research/processed/historical_hdfs/` | Output job historis HDFS (mode lokal) |
 
 Prinsip penting:
@@ -375,7 +376,7 @@ File: `backend/ml/model_evaluator.py`.
 
 Setelah evaluasi, model **dilatih ulang pada semua data yang punya target** (definisi label GMM tetap sama), supaya periode paling baru ikut dipelajari untuk prediksi live. Metrik yang dilaporkan tetap berasal dari model holdout.
 
-Bundle disimpan di `data/research/models/gmm_hgb_v1/model_{SYMBOL}_{TIMEFRAME}.joblib`, berisi labeler, classifier, regressor, model holdout, konfigurasi, dan metadata. Metrik disimpan di `metrics_{SYMBOL}_{TIMEFRAME}.json` dan `latest_metrics.json`. Model versi lain tidak akan dimuat.
+Bundle disimpan di `data/research/models/gmm_hgb_v3/model_{SYMBOL}_{TIMEFRAME}.joblib`, berisi labeler, classifier, regressor, model holdout, konfigurasi, dan metadata. Metrik disimpan di `metrics_{SYMBOL}_{TIMEFRAME}.json` dan `latest_metrics.json`. Model versi lain tidak akan dimuat. Pasangan target wajib berjarak tepat horizon × timeframe; pasangan yang melewati celah waktu dibuang.
 
 ---
 
@@ -391,8 +392,9 @@ File: `backend/ml/model_predictor.py::predict_next_period`. Endpoint: `POST /api
    - Regressor → **volatilitas T+1** (rasio).
 4. Menghitung level harga dari volatilitas prediksi:
    - `estimasi_volatilitas_nominal = harga_sekarang × volatilitas_prediksi`
-   - `resistance_level = harga + estimasi`
-   - `stop_loss_level = harga − estimasi`
+   - `illustrative_upper_bound = harga + estimasi`
+   - `illustrative_lower_bound = harga − estimasi`
+   - Ini ilustrasi range, tanpa jaminan cakupan harga atau efektivitas stop loss. Nama field lama tetap menjadi alias kompatibilitas API.
 5. Mengembalikan juga *snapshot* fitur dan disclaimer bahwa hasil hanya untuk analitik akademik, bukan nasihat investasi.
 
 ---
@@ -411,7 +413,7 @@ Jika `use_spark=true` di konfigurasi, analytics dan training memakai `spark_jobs
 
 File: `spark_jobs/historical_hdfs_job.py`, endpoint `backend/api/historical_hdfs_routes.py` (`POST /api/historical-hdfs/run`).
 
-1. Membaca CSV mentah dari HDFS (`hdfs://127.0.0.1:9000/arkadanta/raw` secara default), yang dikirim ke sana lewat NiFi.
+1. Membaca CSV mentah dari HDFS (`hdfs://127.0.0.1:9000/arkadanta/raw/symbol=<SYMBOL>/`), atau event bersih v3 dari outbox NiFi sesuai pilihan sumber.
 2. Menyamakan nama kolom, membersihkan, dan membuang duplikat dengan Spark.
 3. Mengagregasi ke timeframe yang dipilih dan menghitung fitur (minimal 30 candle).
 4. Melatih dan mengevaluasi model.
@@ -421,7 +423,7 @@ File: `spark_jobs/historical_hdfs_job.py`, endpoint `backend/api/historical_hdfs
 
 Konfigurasi lewat env: `ARKADANTA_HISTORICAL_HDFS_URI`, `ARKADANTA_HISTORICAL_HDFS_RAW_PATH`, `ARKADANTA_HISTORICAL_HDFS_OUTPUT_PATH`, `ARKADANTA_HISTORICAL_OUTPUT_MODE`.
 
-> **Status merge:** cabang `main` mengimplementasikan training job ini dengan Spark MLlib (K-Means + Random Forest), sedangkan cabang `Syafi` memakai GMM + HistGradientBoosting sesuai revisi proposal. Konflik di `spark_jobs/train_models.py` perlu diputuskan agar Tab 4 memakai algoritma yang konsisten.
+> Tab 4 dan Model Lab memakai trainer GMM + HistGradientBoosting yang sama. Training berjalan di driver; Spark mengolah fitur. Model v3 menolak pasangan target yang berlubang dan memakai histori maksimal 365 hari tanpa menghapus arsip. Metrik event volatilitas aktual serta evaluasi berjalan melengkapi metrik kategori relatif GMM.
 
 ### 13.3 Spark UI
 
@@ -517,9 +519,9 @@ Frontend: `frontend/tests/api.test.mjs`, dan pemeriksaan tipe dengan `npx tsc --
 | Agregasi, fitur, anomali, korelasi | Tersedia |
 | GMM + HistGradientBoosting + prediksi T+1 | Tersedia (butuh data cukup) |
 | Fitur & agregasi dengan Spark | Tersedia (butuh Java + PySpark) |
-| Job historis HDFS → Spark (Tab 4) | Tersedia di `main`; algoritma training masih konflik merge |
-| Pengiriman otomatis setiap candle → NiFi → HDFS | Belum |
-| Pengambilan histori 1 tahun + retensi otomatis | Belum |
+| Job historis HDFS → Spark (Tab 4) | Membaca partisi aset, memilih revisi candle terbaru, lalu memakai trainer GMM/HGB bersama |
+| Pengiriman otomatis setiap candle → NiFi → HDFS | Outbox tersedia; flow NiFi harus dikonfigurasi dan diverifikasi saat demo |
+| Pengambilan histori 1 tahun | Backfill tersedia; analisis/training memakai maksimal 365 hari, arsip tidak dihapus otomatis |
 
 Catatan: folder `arkadanta/src/` berisi pipeline lama/alternatif (parser, cleaner, validator, `upload_to_hdfs`) yang fungsinya tumpang tindih dengan `backend/ingestion/`.
 
@@ -532,5 +534,5 @@ Catatan: folder `arkadanta/src/` berisi pipeline lama/alternatif (parser, cleane
 3. Perhatikan **panel Live Market**: harga bergerak real-time.
 4. **Tab 1:** sync data Binance atau upload CSV, lalu tunjukkan laporan audit (baris dibuang, alasan, skor kualitas).
 5. **Tab 2:** pilih timeframe dan metode anomali, jalankan analytics, tunjukkan grafik, daftar anomali, dan korelasi BTC–ETH.
-6. **Tab 3:** pilih fitur dan parameter, latih model, jelaskan centroid GMM → SAFE/WARNING/DANGER, metrik, confusion matrix, dan feature importance. Lalu jalankan prediksi T+1 dan tunjukkan resistance/stop loss.
+6. **Tab 3:** pilih fitur dan parameter, latih model, jelaskan kategori relatif GMM → SAFE/WARNING/DANGER, metrik kategori, validasi event range aktual, dan feature importance. Lalu jalankan prediksi T+1 dan tunjukkan periode target serta batas harga ilustratif.
 7. **Tab 4:** jalankan job historis dari HDFS dan buka Spark UI di `http://localhost:4040` selama job berjalan.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Cpu,
@@ -55,6 +55,8 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
   const [recentPrices, setRecentPrices] = useState<{ time: string; close: number }[]>([]);
   const [training, setTraining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const selection = useRef('');
+  selection.current = `${config.symbol}/${config.timeframe}/${config.target_horizon}`;
 
   const loadAll = async (isActive: () => boolean) => {
     setError(null);
@@ -83,19 +85,23 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
     let active = true;
     loadAll(() => active);
     return () => { active = false; };
-  }, [config.symbol, config.timeframe, dataRevision]);
+  }, [config.symbol, config.timeframe, config.target_horizon, dataRevision]);
 
   const handleTrainModel = async () => {
+    const trainingSelection = selection.current;
     setTraining(true);
     setError(null);
     setMetrics(null);
     setPrediction(null);
     try {
       const mRes = await trainAndEvaluateModels(config);
+      if (selection.current !== trainingSelection) return;
       setMetrics(mRes);
       const pRes = await predictNextPeriodApi(config.symbol, config.timeframe, config.target_horizon);
+      if (selection.current !== trainingSelection) return;
       setPrediction(pRes);
     } catch (err) {
+      if (selection.current !== trainingSelection) return;
       setError(err instanceof Error ? err.message : 'Pelatihan model gagal.');
     } finally {
       setTraining(false);
@@ -177,26 +183,31 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
 
                 <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
                   <span className="text-[11px] text-[#9a9a9a] block">
-                    Resistance Bound (T+1)
+                    Batas ilustratif atas (T+1)
                   </span>
                   <span className="text-lg font-mono font-semibold text-[#00f2c3] mt-0.5 block">
-                    ${prediction.resistance_level.toLocaleString()}
+                    ${prediction.illustrative_upper_bound.toLocaleString()}
                   </span>
                   <span className="text-[10px] text-[#9a9a9a]">Price + Est. Volatility</span>
                 </div>
 
                 <div className="bg-[#1e1e2f] p-3.5 rounded-[0.4285rem] border border-[#2b3553]">
                   <span className="text-[11px] text-[#9a9a9a] block">
-                    Stop Loss Bound (T+1)
+                    Batas ilustratif bawah (T+1)
                   </span>
                   <span className="text-lg font-mono font-semibold text-[#fd5d93] mt-0.5 block">
-                    ${prediction.stop_loss_level.toLocaleString()}
+                    ${prediction.illustrative_lower_bound.toLocaleString()}
                   </span>
                   <span className="text-[10px] text-[#9a9a9a]">Price &minus; Est. Volatility</span>
                 </div>
               </div>
 
               {/* Class Probability Bars */}
+              <div className="text-xs text-[#9a9a9a] space-y-2">
+                <p>Candle sumber: {prediction.candle_timestamp}. Periode target: {prediction.target_start} sampai {prediction.target_end} (UTC).</p>
+                <p>{prediction.bounds_definition}</p>
+                <p>{prediction.risk_label_definition}</p>
+              </div>
               <div>
                 <div className="flex items-center justify-between text-xs text-[#9a9a9a] mb-2">
                   <span>HistGradientBoosting T+1 Regime Probabilities</span>
@@ -249,7 +260,7 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
               <div>
                 <h5 className="bd-card-category">Dynamic Volatility Corridor</h5>
                 <h2 className="bd-card-title">
-                  {prediction.symbol} ({prediction.timeframe}) Resistance &amp; Stop Loss Bands
+                  {prediction.symbol} ({prediction.timeframe}) Batas gejolak ilustratif
                 </h2>
               </div>
               <div className="inline-flex">
@@ -288,8 +299,8 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                     />
                     <YAxis
                       domain={[
-                        prediction.stop_loss_level * 0.996,
-                        prediction.resistance_level * 1.004,
+                        prediction.illustrative_lower_bound * 0.996,
+                        prediction.illustrative_upper_bound * 1.004,
                       ]}
                       tick={{ fontSize: 11, fill: '#9a9a9a' }}
                       axisLine={false}
@@ -304,22 +315,22 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
                       }}
                     />
                     <ReferenceLine
-                      y={prediction.resistance_level}
+                      y={prediction.illustrative_upper_bound}
                       stroke="#00f2c3"
                       strokeDasharray="4 4"
                       label={{
-                        value: `Resistance T+1 ($${prediction.resistance_level})`,
+                        value: `Ilustrasi atas ($${prediction.illustrative_upper_bound})`,
                         fill: '#00f2c3',
                         fontSize: 11,
                         position: 'insideTopRight',
                       }}
                     />
                     <ReferenceLine
-                      y={prediction.stop_loss_level}
+                      y={prediction.illustrative_lower_bound}
                       stroke="#fd5d93"
                       strokeDasharray="4 4"
                       label={{
-                        value: `Stop Loss T+1 ($${prediction.stop_loss_level})`,
+                        value: `Ilustrasi bawah ($${prediction.illustrative_lower_bound})`,
                         fill: '#fd5d93',
                         fontSize: 11,
                         position: 'insideBottomRight',
@@ -480,6 +491,20 @@ export const Tab3ModelLabShield: React.FC<Props> = ({ config, onChangeConfig, da
       {/* ROW 3: EVALUATION METRICS, CENTROID RANKING & FEATURE IMPORTANCES */}
       {metrics && (
         <>
+          <section className="bd-card" aria-label="Definisi dan evaluasi model">
+            <div className="bd-card-body text-xs space-y-3">
+              <p>Model aktif: {metrics.symbol} / {metrics.timeframe} · {metrics.model_version} · Dilatih {metrics.trained_at}</p>
+              <p>Histori training UTC: {metrics.research_window.data_start} sampai {metrics.research_window.data_end} (maksimal {metrics.research_window.max_days} hari).</p>
+              <p>Fitur model tersimpan: {metrics.features.join(', ')}. Pilihan parameter di bawah berlaku setelah training berikutnya.</p>
+              <p>{metrics.risk_label_definition} F1 klasifikasi mengukur prediksi kategori GMM.</p>
+              <p>Validasi kejadian terukur: {metrics.volatility_event_validation.definition}. Ambang: {(metrics.volatility_event_validation.threshold * 100).toFixed(3)}%.</p>
+              <p>Event aktual: {metrics.volatility_event_validation.actual_events}/{metrics.volatility_event_validation.test_samples} · F1 event: {metrics.volatility_event_validation.f1.toFixed(3)} · F1 pembanding tetap sama: {metrics.volatility_event_validation.persistence_f1.toFixed(3)}.</p>
+              <p>Evaluasi volatilitas berjalan pada {metrics.walk_forward_volatility.length} periode uji. Masing-masing hanya menggunakan data sebelumnya:</p>
+              <ul className="space-y-1">
+                {metrics.walk_forward_volatility.map((fold) => <li key={fold.test_start}>{fold.test_start} – {fold.test_end}: {fold.samples} sampel, RMSE {fold.rmse.toFixed(6)}.</li>)}
+              </ul>
+            </div>
+          </section>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Gaussian Mixture Centroid Risk Ordering Table */}
             <div className="lg:col-span-7 bd-card">

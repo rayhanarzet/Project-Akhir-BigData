@@ -44,6 +44,13 @@ export interface HistoricalBaselineResponse {
   hdfs_cluster_path: string;
   assets: AssetBaseline[];
   audit_logs: IngestionAuditReport[];
+  integration?: {
+    backend: string;
+    stream: string;
+    nifi: { status: string; detail: string };
+    hdfs: { status: string; file_count: number | null; bytes: number | null; detail: string };
+    outbox: { pending_recovery_batches: number; queued_files: number; delivery_confirmed: boolean; detail: string };
+  };
 }
 
 export interface CronStatus {
@@ -125,12 +132,15 @@ export interface CorrelationResponse {
   symbols: string[];
   base_symbol: string;
   target_symbol: string;
-  pearson_matrix: Record<string, Record<string, number>>;
-  rolling_correlation: { timestamp: string; rolling_corr: number }[];
-  lag_correlation: { lag: number; correlation: number; interpretation: string }[];
-  market_wide_risk_score: number;
-  market_wide_regime: RiskRegime;
-  market_risk_timeline: { timestamp: string; risk_score: number }[];
+  pearson_matrix: Record<string, Record<string, number | null>>;
+  paired_observations: Record<string, Record<string, number>>;
+  rolling_correlation: { timestamp: string; rolling_corr: number | null }[];
+  lag_correlation: { lag: number; correlation: number | null; interpretation: string }[];
+  market_wide_risk_score: number | null;
+  market_wide_regime: RiskRegime | null;
+  market_risk_timeline: { timestamp: string; risk_score: number | null }[];
+  market_timestamp: string;
+  observation_policy: string;
 }
 
 export interface CentroidRecord {
@@ -146,6 +156,10 @@ export interface ModelMetricsResponse {
   model_version: string;
   feature_importance_method: string;
   trained_at: string;
+  research_window: { max_days: number; data_start: string; data_end: string; excluded_rows: number };
+  risk_label_definition: string;
+  volatility_event_validation: { definition: string; threshold: number; actual_events: number; test_samples: number; precision: number; recall: number; f1: number; persistence_f1: number };
+  walk_forward_volatility: { test_start: string; test_end: string; samples: number; mae: number; rmse: number }[];
   execution_engine?: string;
   symbol: string;
   timeframe: Timeframe;
@@ -235,6 +249,13 @@ export interface HistoricalHdfsRunResponse extends ModelMetricsResponse {
 export interface PredictionResponse {
   timestamp: string;
   candle_timestamp: string;
+  target_start: string;
+  target_end: string;
+  model_trained_at: string;
+  risk_label_definition: string;
+  bounds_definition: string;
+  illustrative_upper_bound: number;
+  illustrative_lower_bound: number;
   symbol: string;
   timeframe: Timeframe;
   target_horizon: number;

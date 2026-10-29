@@ -3,6 +3,11 @@
 from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
+from backend.analytics.timeframe_aggregator import TIMEFRAME_DURATION, TIMEFRAME_PANDAS_MAP
+
+
+def _number(value):
+    return round(float(value), 4) if pd.notna(value) and np.isfinite(value) else None
 
 
 def analyze_cross_asset_correlation(
@@ -12,6 +17,7 @@ def analyze_cross_asset_correlation(
     value_col: str = "log_return",
     rolling_window: int = 30,
     max_lag: int = 6,
+    timeframe: str = "1h",
 ) -> Dict[str, Any]:
     """Menghitung Pearson correlation matrix, rolling correlation, lag correlation, dan market-wide risk score."""
     if df_multi.empty:
@@ -24,8 +30,7 @@ def analyze_cross_asset_correlation(
     pivot_ret = (
         df.pivot_table(index="timestamp", columns="coin_symbol", values=value_col)
         .sort_index()
-        .ffill()
-        .fillna(0.0)
+        .asfreq(TIMEFRAME_PANDAS_MAP[timeframe])
     )
     pivot_vol = (
         df.pivot_table(
@@ -34,12 +39,13 @@ def analyze_cross_asset_correlation(
             values="max_volatility" if "max_volatility" in df.columns else value_col,
         )
         .sort_index()
-        .ffill()
-        .fillna(0.0)
+        .reindex(pivot_ret.index)
     )
 
     symbols: List[str] = list(pivot_ret.columns)
-    corr_matrix = pivot_ret.corr(method="pearson").round(4).fillna(0.0)
+    corr_matrix = pivot_ret.corr(method="pearson", min_periods=5).round(4)
+    observations = pivot_ret.notna().astype(int)
+    pair_counts = observations.T.dot(observations)
 
     if base_symbol not in symbols and symbols:
         base_symbol = symbols[0]
@@ -53,11 +59,10 @@ def analyze_cross_asset_correlation(
         pivot_ret[base_symbol]
         .rolling(window=rolling_window, min_periods=5)
         .corr(pivot_ret[target_symbol])
-        .replace([np.inf, -np.inf], 0.0)
-        .fillna(0.0)
+        .replace([np.inf, -np.inf], np.nan)
     )
     rolling_records = [
-        {"timestamp": ts.isoformat(), "rolling_corr": round(float(val), 4)}
+        {"timestamp": ts.isoformat(), "rolling_corr": _number(val)}
         for ts, val in rolling_series.tail(250).items()
     ]
 
@@ -66,11 +71,13 @@ def analyze_cross_asset_correlation(
     s_base = pivot_ret[base_symbol]
     s_targ = pivot_ret[target_symbol]
     for lag in range(-max_lag, max_lag + 1):
-        c_val = s_base.corr(s_targ.shift(-lag))
+        paired_samples = int((s_base.notna() & s_targ.shift(-lag).notna()).sum())
+        c_val = s_base.corr(s_targ.shift(-lag)) if paired_samples >= 5 else np.nan
         lag_records.append(
             {
                 "lag": lag,
-                "correlation": round(float(0.0 if pd.isna(c_val) else c_val), 4),
+                "correlation": _number(c_val) if paired_samples >= 5 else None,
+                "paired_samples": paired_samples,
                 "interpretation": (
                     f"{base_symbol} mendahului {target_symbol} {lag} periode"
                     if lag > 0
@@ -84,13 +91,16 @@ def analyze_cross_asset_correlation(
         )
 
     # Market-Wide Risk Score (0 - 100) berdasarkan persentil volatilitas gabungan seluruh aset
-    z_vols = (pivot_vol - pivot_vol.mean()) / pivot_vol.std().replace(0, 1.0)
-    composite_z = z_vols.mean(axis=1)
+    past = pivot_vol.shift(1).rolling(rolling_window, min_periods=5)
+    z_vols = (pivot_vol - past.mean()) / past.std().replace(0, np.nan)
+    composite_z = z_vols.mean(axis=1, skipna=False)
     market_risk_series = np.clip(50.0 + composite_z * 20.0, 0.0, 100.0)
-    current_market_risk = round(float(market_risk_series.iloc[-1]), 2) if len(market_risk_series) else 0.0
+    latest = pivot_ret.index[-1]
+    fresh = pd.Timestamp.now(tz="UTC") < latest + TIMEFRAME_DURATION[timeframe] * 2
+    current_market_risk = _number(market_risk_series.iloc[-1]) if fresh else None
 
     market_regime = (
-        "DANGER"
+        None if current_market_risk is None else "DANGER"
         if current_market_risk >= 70.0
         else ("WARNING" if current_market_risk >= 45.0 else "SAFE")
     )
@@ -99,13 +109,18 @@ def analyze_cross_asset_correlation(
         "symbols": symbols,
         "base_symbol": base_symbol,
         "target_symbol": target_symbol,
-        "pearson_matrix": corr_matrix.to_dict(),
+        "pearson_matrix": {col: {row: _number(value) for row, value in values.items()} for col, values in corr_matrix.to_dict().items()},
+        "paired_observations": pair_counts.to_dict(),
+        "observation_policy": "Hanya pasangan timestamp nyata; nilai hilang tidak diisi. Skor pasar memakai statistik periode lampau.",
+        "asset_freshness": {sym: {"last_timestamp": str(pivot_vol[sym].last_valid_index()),
+                                  "latest_observed": bool(pd.notna(pivot_vol[sym].iloc[-1]))} for sym in symbols},
+        "market_timestamp": latest.isoformat(),
         "rolling_correlation": rolling_records,
         "lag_correlation": lag_records,
         "market_wide_risk_score": current_market_risk,
         "market_wide_regime": market_regime,
         "market_risk_timeline": [
-            {"timestamp": ts.isoformat(), "risk_score": round(float(val), 2)}
+            {"timestamp": ts.isoformat(), "risk_score": _number(val)}
             for ts, val in market_risk_series.tail(200).items()
         ],
     }
@@ -115,6 +130,7 @@ def compute_historical_factor_attribution(
     df: pd.DataFrame,
     feature_cols: List[str] | None = None,
     max_lag: int = 5,
+    timeframe: str = "1h",
 ) -> List[Dict[str, Any]]:
     """Menganalisis faktor historis pada periode/hari lampau (T-1 s.d. T-max_lag) yang paling mempengaruhi volatilitas hari ini (T)."""
     if df.empty or "max_volatility" not in df.columns:
@@ -138,6 +154,7 @@ def compute_historical_factor_attribution(
         if c in df.columns
     ]
 
+    df = df.sort_values("timestamp").set_index(pd.to_datetime(df["timestamp"], utc=True))
     target_today = df["max_volatility"].astype(float)
     records: List[Dict[str, Any]] = []
 
@@ -148,7 +165,9 @@ def compute_historical_factor_attribution(
         lag_profile: Dict[str, float] = {}
 
         for lag in range(1, max_lag + 1):
-            c_val = target_today.corr(s_col.shift(lag))
+            past = s_col.reindex(s_col.index - TIMEFRAME_DURATION[timeframe] * lag)
+            past.index = s_col.index
+            c_val = target_today.corr(past)
             c_clean = 0.0 if pd.isna(c_val) else float(c_val)
             lag_profile[f"T-{lag}"] = round(c_clean, 4)
             if abs(c_clean) >= abs(best_corr):

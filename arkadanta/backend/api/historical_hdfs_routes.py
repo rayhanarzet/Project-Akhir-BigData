@@ -47,7 +47,7 @@ def get_historical_hdfs_config():
             if HISTORICAL_OUTPUT_MODE == "hdfs"
             else str(HISTORICAL_LOCAL_OUTPUT_PATH)
         ),
-        "default_input_pattern": f"{HISTORICAL_HDFS_URI}{HISTORICAL_HDFS_RAW_PATH}",
+        "default_input_pattern": f"{HISTORICAL_HDFS_URI}{HISTORICAL_HDFS_RAW_PATH}/symbol=<SYMBOL>",
         "clean_input_pattern": f"{HISTORICAL_HDFS_URI}{HDFS_BASE_PATH}symbol=<SYMBOL>/year=<YYYY>/month=<MM>/",
         "expected_format": "CSV with OHLCV header row and 5m candles",
         "default_features": DEFAULT_FEATURES,

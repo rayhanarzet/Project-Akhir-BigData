@@ -10,6 +10,7 @@ class IngestionAuditReport(BaseModel):
     run_id: str
     timestamp: str
     source_name: str
+    source_sha256: Optional[str] = None
     format_detected: Literal["CSV", "JSON", "BINANCE_API"]
     selected_pipeline: str
     column_mapping: Dict[str, str] = Field(default_factory=dict)

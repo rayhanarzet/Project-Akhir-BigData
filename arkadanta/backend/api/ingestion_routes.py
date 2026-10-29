@@ -22,6 +22,7 @@ from backend.schemas import (
 )
 from backend.scheduler import cron_scheduler
 from data.storage import load_audit_logs, load_clean_ohlcv
+from backend.integration_status import get_integration_status
 
 router = APIRouter(tags=["Ingestion & Baseline"])
 
@@ -108,9 +109,10 @@ def get_historical_baseline():
                 "status": "READY",
             }
         )
-    logs = load_audit_logs()
+    logs = load_audit_logs(limit=20)
     return {
-        "pipeline_status": "ONLINE" if assets_summary else "NO_DATA",
+        "pipeline_status": "LOCAL_DATA_READY" if assets_summary else "NO_DATA",
+        "integration": get_integration_status(),
         "hdfs_cluster_path": HDFS_BASE_PATH,
         "assets": assets_summary,
         "audit_logs": logs[:20],

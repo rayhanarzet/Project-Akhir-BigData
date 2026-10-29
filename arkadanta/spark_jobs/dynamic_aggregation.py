@@ -46,7 +46,8 @@ def spark_aggregate_timeframe(df_5m: DataFrame, timeframe: str = "1h") -> DataFr
         "first_open", F.first("open").over(w_asc)
     ).withColumn("last_close", F.last("close").over(w_asc))
 
-    optional = [F.sum(c).alias(c) for c in OPTIONAL_SUM_COLUMNS if c in df.columns]
+    optional = [F.when(F.count(c) == F.count("*"), F.sum(c)).alias(c)
+                for c in OPTIONAL_SUM_COLUMNS if c in df.columns]
     agg_df = (
         df_with_oc.groupBy("coin_symbol", "time_bucket")
         .agg(

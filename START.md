@@ -1,5 +1,20 @@
 # Menjalankan Arkadanta (Windows + Ubuntu WSL)
 
+## Setelah pembaruan integritas data v3 (sekali)
+
+1. Hentikan backend lama dengan `Ctrl+C`, lalu jalankan kembali sesuai bagian A.3. Refresh dashboard.
+2. Di NiFi, hentikan sementara **PutHDFS**, ubah **Conflict Resolution Strategy** menjadi **ignore**, lalu Start kembali. Nama berkas event bersifat unik dan tetap saat retry; ignore membuat replay event yang sama aman.
+3. **GetFile Input Directory** tetap `.../data/research/nifi_outbox`, dan **Recurse Subdirectories = true**. **UpdateAttribute hdfs.dir** tetap `/user/arkadanta/data/clean/crypto/${path}`. Event baru memiliki awalan direktori `v3/`, sehingga tujuannya otomatis `/user/arkadanta/data/clean/crypto/v3/symbol=.../`.
+4. Jalankan **Data Ingestion → Backfill Histori**, maksimal 365 hari. Ini juga menerbitkan ulang candle lokal lama yang belum berversi ke antrean v3. Dataset/arsip sebelumnya tetap disimpan.
+5. Tunggu data masuk HDFS, lalu jalankan **Historical HDFS Batch → Clean**, atau latih melalui **Model Lab** untuk jalur CSV. Model baru berada di `data/research/models/gmm_hgb_v3/`; model lama perlu dilatih ulang.
+6. Periksa rentang histori, jam candle sumber, jam periode target, serta panel **Status integrasi** pada dashboard. Status port NiFi dan direktori HDFS bukan konfirmasi bahwa setiap candle sudah terkirim.
+
+Jika startup gagal saat memulihkan jurnal, perbaiki izin/ruang disk pada `data/research/drop_zone` dan `nifi_outbox`, lalu restart. Jangan menghapus `.pending`: berkas di sana adalah perubahan data yang menunggu pemulihan.
+
+Audit lengkap tersimpan di `data/research/audit_logs.jsonl`; `audit_logs.json` hanya snapshot kompatibilitas 50 catatan terbaru. Training/analisis memakai 365 hari terakhir, sementara arsip yang lebih tua tetap ada. Upload dengan NaN/Inf, OHLCV kosong, timestamp di luar grid 5m, atau candle belum selesai ditolak dan dihitung dalam laporan kualitas.
+
+Untuk mencegah penumpukan berkas kecil selama penggunaan rutin, terapkan [penggabungan berkas NiFi](arkadanta/nifi/README.md). Jalur langsung GetFile → PutHDFS tetap tersedia untuk demo singkat; penggabungan memberi jeda HDFS sampai satu jam dan tidak menunda harga live dashboard.
+
 Dashboard React jalan di **Windows**. Backend Python, HDFS, NiFi, dan PySpark jalan di **Ubuntu WSL**.
 
 > **Tentang "database":** Arkadanta tidak memakai server database (tidak ada MySQL/Postgres yang perlu dinyalakan).
@@ -121,7 +136,7 @@ Refresh browser NiFi (`Ctrl+F5`) agar PutHDFS muncul di daftar processor.
 ### Flow NiFi (dibuat sekali)
 
 Setiap baris baru yang disimpan backend otomatis ditulis ke
-`arkadanta/data/research/nifi_outbox/symbol=…/year=…/month=…/`. NiFi tinggal memindahkannya ke HDFS:
+`arkadanta/data/research/nifi_outbox/v3/symbol=…/year=…/month=…/`. NiFi tinggal memindahkannya ke HDFS:
 
 ```text
 GetFile ──success──▶ UpdateAttribute ──success──▶ PutHDFS
@@ -138,7 +153,7 @@ GetFile ──success──▶ UpdateAttribute ──success──▶ PutHDFS
 | **UpdateAttribute** | tambah property baru (tombol **+**) `hdfs.dir` | `/user/arkadanta/data/clean/crypto/${path}` |
 | **PutHDFS** | Hadoop Configuration Resources | `/home/anam/hadoop/etc/hadoop/core-site.xml,/home/anam/hadoop/etc/hadoop/hdfs-site.xml` |
 | | Directory | `${hdfs.dir}` |
-| | Conflict Resolution Strategy | `fail` |
+| | Conflict Resolution Strategy | `ignore` |
 
 Lalu klik kanan area kosong kanvas → **Start**. Bukti berhasil:
 
@@ -177,8 +192,9 @@ Untuk Tab 4, tunggu NiFi selesai memindahkan data setelah backfill (cek jumlah C
 arkadanta/data/research/
 ├── drop_zone/        CSV bersih per aset (dipakai Tab 1–3)
 ├── nifi_outbox/      antrean untuk NiFi → HDFS
-├── models/gmm_hgb_v2/  model hasil training
-└── audit_logs.json   riwayat ingestion
+├── models/gmm_hgb_v3/  model hasil training
+├── audit_logs.jsonl  riwayat ingestion lengkap
+└── audit_logs.json   snapshot 50 catatan terbaru
 ```
 
 ---
@@ -210,7 +226,7 @@ Setiap WSL di-restart (mis. setelah laptop mati), bagian **A** perlu diulang dar
 | Training: data terlalu sedikit | Lihat tabel kebutuhan data di C. Backfill atau pilih timeframe lebih kecil. |
 | Tab 4: `No module named 'pyspark'` | Backend jalan di venv WSL: `python -m pip install -r requirements-spark.txt` di venv itu, lalu restart backend. |
 | Tab 4: `Hanya N baris valid …` | Data di HDFS belum cukup atau NiFi belum memindahkan semuanya. Cek C.4, lalu pilih sumber **Clean**. |
-| Tab 4: Sumber **Raw** gagal | `/arkadanta/raw` kosong. Gunakan sumber **Clean**. |
+| Tab 4: Sumber **Raw** gagal | Isi `/arkadanta/raw/symbol=BTCUSDT/` dengan data BTC, atau gunakan sumber **Clean**. Raw wajib terpisah per simbol. |
 | NiFi: `Key Password length less than required [12]` | `nifi.sensitive.props.key` di `nifi.properties` kurang dari 12 karakter. Ganti ke string ≥ 12 karakter (NiFi belum pernah punya flow). |
 | NiFi: browser `ERR_CONNECTION_CLOSED`/tidak bisa dibuka dari Windows | Set `nifi.web.https.host=0.0.0.0` (bagian B). NiFi yang di-start dari sesi `wsl.exe` non-interaktif ikut mati; start dari terminal Ubuntu Anda. |
 | NiFi berjalan tetapi HDFS kosong | Periksa spasi di awal property PutHDFS, property `hdfs.dir` di UpdateAttribute, dan bulletin merah di PutHDFS. |

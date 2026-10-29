@@ -1,12 +1,12 @@
 """Additive historical-data pipeline: HDFS CSV -> Spark features/ML -> HDFS outputs."""
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timezone
 import json
 import re
 import uuid
 from pathlib import Path
 
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import NumericType
 
@@ -21,9 +21,11 @@ from backend.config import (
 from spark_jobs.dynamic_aggregation import spark_aggregate_timeframe
 from spark_jobs.feature_pipeline import spark_compute_features
 from spark_jobs.locks import exclusive_spark
-from spark_jobs.train_models import spark_train_and_evaluate
+from spark_jobs.train_models import spark_train_and_evaluate, collect_model_features
 from backend.ml.model_trainer import bundle_path
 from backend.schemas import DynamicConfig
+from backend.analytics.research_window import research_bounds
+from data.validation import OPTIONAL_NUMERIC
 
 
 ALIASES = {
@@ -77,7 +79,8 @@ def _qualify_hdfs_path(path: str) -> str:
 
 
 def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_date: str):
-    df = spark.read.option("header", True).option("inferSchema", True).csv(source_path)
+    reader = spark.read.option("multiLine", True).option("escape", '"').option("inferSchema", True)
+    df = reader.option("header", True).option("enforceSchema", False).csv(source_path)
     # Binance historical kline CSV exports commonly have no header and use
     # the standard 12 positional fields. Detect those before treating row 1
     # as column names.
@@ -89,13 +92,14 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
         for col in ("open", "high", "low", "close", "volume")
     ) and bool(normalized_header.intersection({"timestamp", "open_time", "time", "date", "datetime"}))
     if not header_has_ohlcv:
-        df = spark.read.option("header", False).option("inferSchema", True).csv(source_path)
-        if len(df.columns) != len(BINANCE_KLINE_COLUMNS):
+        df = reader.option("header", False).csv(source_path)
+        positional = [col for col in df.columns if re.fullmatch(r"_c\d+", col)]
+        if len(positional) != len(BINANCE_KLINE_COLUMNS):
             raise ValueError(
                 "Header CSV tidak dikenali dan jumlah kolom bukan format Binance Kline 12 kolom. "
                 f"Kolom yang terbaca: {df.columns}"
             )
-        for old, new in zip(df.columns, BINANCE_KLINE_COLUMNS):
+        for old, new in zip(positional, BINANCE_KLINE_COLUMNS):
             df = df.withColumnRenamed(old, new)
 
     rename = {}
@@ -116,7 +120,12 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
     if missing:
         raise ValueError(f"Kolom wajib tidak ditemukan di CSV HDFS: {missing}")
     if "coin_symbol" not in df.columns:
-        df = df.withColumn("coin_symbol", F.lit(symbol))
+        filename = F.input_file_name()
+        partition_symbol = F.regexp_extract(filename, r"/symbol=([A-Za-z0-9]{2,30})(?:/|$)", 1)
+        named_symbol = F.regexp_extract(filename, r"/([A-Za-z0-9]{2,30})-5m-", 1)
+        df = df.withColumn("coin_symbol", F.when(partition_symbol != "", partition_symbol).otherwise(named_symbol))
+        if df.filter(F.col("coin_symbol") == "").limit(1).count():
+            raise ValueError("CSV Raw tanpa simbol wajib berada di partisi symbol=<ASET> atau bernama <ASET>-5m-*.csv.")
 
     timestamp_type = df.schema["timestamp"].dataType
     sample_timestamp = df.select("timestamp").where(F.col("timestamp").isNotNull()).first()
@@ -146,7 +155,7 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
         df = df.withColumn("timestamp", F.to_timestamp("timestamp"))
 
     for col in ("open", "high", "low", "close", "volume"):
-        df = df.withColumn(col, F.col(col).cast("double"))
+        df = df.withColumn(col, F.expr(f"try_cast(`{col}` as double)"))
     df = df.withColumn("coin_symbol", F.upper(F.trim(F.col("coin_symbol").cast("string"))))
     df = df.filter(
         (F.col("coin_symbol") == symbol)
@@ -165,9 +174,31 @@ def _normalise_ohlcv(spark, source_path: str, symbol: str, start_date: str, end_
         & (F.col("low") <= F.least("open", "close", "high"))
         & (F.col("timestamp") >= F.to_timestamp(F.lit(start_date)))
         & (F.col("timestamp") <= F.to_timestamp(F.lit(end_date)))
+        & (F.col("timestamp").cast("double") % F.lit(300) == 0)
+        & (F.col("timestamp") + F.expr("INTERVAL 5 MINUTES") <= F.current_timestamp())
     )
+    for col in ("open", "high", "low", "close", "volume"):
+        df = df.filter(~F.isnan(col) & (F.abs(F.col(col)) < F.lit(float("inf"))))
+    for col in OPTIONAL_NUMERIC:
+        if col in df.columns:
+            number = F.expr(f"try_cast(`{col}` as double)")
+            valid = number.isNotNull() & ~F.isnan(number) & (F.abs(number) < F.lit(float("inf"))) & (number >= 0)
+            if col == "number_of_trades":
+                valid = valid & (number % 1 == 0)
+            df = df.filter(F.col(col).isNull() | valid).withColumn(col, number)
+    if "ingestion_version" not in df.columns:
+        df = df.withColumn("ingestion_version", F.lit(0).cast("long"))
+    else:
+        df = df.withColumn("ingestion_version", F.expr("try_cast(ingestion_version as bigint)"))
+        if df.filter(F.col("ingestion_version").isNull() | (F.col("ingestion_version") < 0)).limit(1).count():
+            raise ValueError("Versi candle HDFS tidak valid.")
     before_dedup = df.count()
-    cleaned = df.dropDuplicates(["coin_symbol", "timestamp"]).orderBy("timestamp")
+    conflicts = df.groupBy("coin_symbol", "timestamp", "ingestion_version").agg(
+        F.countDistinct(F.struct(*[F.col(c) for c in (*REQUIRED, *OPTIONAL_NUMERIC) if c in df.columns])).alias("variants"))
+    if conflicts.filter(F.col("variants") > 1).limit(1).count():
+        raise ValueError("Candle HDFS memiliki nilai berbeda dengan timestamp dan versi sama. Perbaiki sumber sebelum training.")
+    order = Window.partitionBy("coin_symbol", "timestamp").orderBy(F.col("ingestion_version").desc())
+    cleaned = df.withColumn("_revision_order", F.row_number().over(order)).filter("_revision_order = 1").drop("_revision_order").orderBy("timestamp")
     return cleaned, before_dedup
 
 
@@ -180,34 +211,11 @@ def run_historical_hdfs_job(config: DynamicConfig, input_path: str | None = None
 def _run_historical_hdfs_job(config: DynamicConfig, input_path: str | None) -> dict:
     symbol, timeframe = config.symbol.upper(), config.timeframe
     start_date, end_date = config.start_date, config.end_date
-    now = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
-    default_start = (now.replace(tzinfo=timezone.utc) - timedelta(days=365)).replace(tzinfo=None)
-    start = datetime.fromisoformat(start_date).replace(tzinfo=None) if start_date else default_start
-    end = datetime.fromisoformat(end_date).replace(tzinfo=None) if end_date else now
-    if start_date and len(start_date) == 10:
-        start = datetime.combine(start.date(), time.min)
-    if end_date and len(end_date) == 10:
-        end = datetime.combine(end.date(), time.max.replace(microsecond=0))
-    earliest_allowed = now - timedelta(days=365)
-    # Date inputs represent whole UTC calendar days. For today's date, cap the
-    # inclusive end-of-day value at the actual current time.
-    if end_date and len(end_date) == 10 and end.date() == now.date():
-        end = now
-    if start < earliest_allowed or end > now or start >= end:
-        raise ValueError(
-            "Rentang tanggal tidak valid. "
-            f"Diterima start_date={start.isoformat(sep=' ')}, "
-            f"end_date={end.isoformat(sep=' ')}; batas UTC "
-            f"{earliest_allowed.isoformat(sep=' ')} sampai {now.isoformat(sep=' ')} "
-            "dan start_date harus sebelum end_date."
-        )
-
-    start_iso, end_iso = start.isoformat(sep=" "), end.isoformat(sep=" ")
-    # The default NiFi flow writes all historical CSV files directly under
-    # the configured raw root. Symbol filtering happens after reading; callers
-    # with partitioned HDFS layouts can still pass an explicit input_path.
+    start, end = research_bounds(start_date, end_date)
+    start_iso, end_iso = start.isoformat(), end.isoformat()
+    # Raw wajib terpisah per simbol agar CSV tanpa kolom simbol tidak tercampur.
     source_path = _qualify_hdfs_path(input_path) if input_path else _qualify_hdfs_path(
-        HISTORICAL_HDFS_RAW_PATH
+        f"{HISTORICAL_HDFS_RAW_PATH.rstrip('/')}/symbol={symbol}"
     )
     run_id = f"hist_{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}_{uuid.uuid4().hex[:6]}"
     if HISTORICAL_OUTPUT_MODE == "hdfs":
@@ -310,7 +318,7 @@ def _run_historical_hdfs_job(config: DynamicConfig, input_path: str | None) -> d
         )
         metrics_json = json.dumps(metrics, default=str, sort_keys=True)
         if local_output_root is not None:
-            features.toPandas().to_csv(curated_path, index=False)
+            collect_model_features(features).to_csv(curated_path, index=False)
             Path(metrics_path).write_text(metrics_json, encoding="utf-8")
         else:
             features.write.mode("errorifexists").parquet(curated_path)

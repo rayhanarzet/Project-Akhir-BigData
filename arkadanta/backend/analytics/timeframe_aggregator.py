@@ -3,6 +3,7 @@
 from typing import Optional
 import numpy as np
 import pandas as pd
+from backend.analytics.research_window import filter_research_window
 
 
 TIMEFRAME_PANDAS_MAP = {
@@ -15,6 +16,7 @@ TIMEFRAME_PANDAS_MAP = {
     "1w": "W-MON",
 }
 TIMEFRAME_DURATION = {
+    "5m": pd.Timedelta(minutes=5),
     "15m": pd.Timedelta(minutes=15),
     "1h": pd.Timedelta(hours=1),
     "4h": pd.Timedelta(hours=4),
@@ -31,14 +33,9 @@ def aggregate_timeframe(
     end_date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Mengagregasi data 5 menit menjadi timeframe target dengan urutan timestamp eksplisit."""
-    df = df_5m.copy()
+    df = filter_research_window(df_5m, start_date, end_date)
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
     df = df.sort_values(["coin_symbol", "timestamp"]).reset_index(drop=True)
-
-    if start_date:
-        df = df[df["timestamp"] >= pd.to_datetime(start_date, utc=True)]
-    if end_date:
-        df = df[df["timestamp"] <= pd.to_datetime(end_date, utc=True)]
 
     if df.empty:
         return df
@@ -60,6 +57,7 @@ def aggregate_timeframe(
 
     for sym, grp in df.groupby("coin_symbol", sort=False):
         grp = grp.sort_values("timestamp").set_index("timestamp")
+        expected = int(TIMEFRAME_DURATION[timeframe] / BASE_CANDLE)
         agg_dict = {
             "open": "first",
             "high": "max",
@@ -68,24 +66,26 @@ def aggregate_timeframe(
             "volume": "sum",
             "candle_volatility": ["max", "mean", "count"],
         }
-        for opt_col in (
+        optional_cols = [col for col in (
             "quote_asset_volume",
             "number_of_trades",
             "taker_buy_base_volume",
             "taker_buy_quote_volume",
-        ):
-            if opt_col in grp.columns:
-                agg_dict[opt_col] = "sum"
+        ) if col in grp.columns]
+        agg_dict.update(dict.fromkeys(optional_cols, "sum"))
 
         res = grp.resample(freq, label="left", closed="left").agg(agg_dict)
         res.columns = [
             f"{c[0]}_{c[1]}" if c[0] == "candle_volatility" else c[0]
             for c in res.columns
         ]
+        if optional_cols:
+            # Total hanya bermakna bila sumber seluruh candle dalam bucket tersedia.
+            counts = grp[optional_cols].resample(freq, label="left", closed="left").count()
+            res[optional_cols] = res[optional_cols].where(counts.eq(expected))
         res = res.dropna(subset=["open", "high", "low", "close"]).reset_index()
         # Hanya bucket dengan candle 5m lengkap: bucket berjalan (terakhir) atau berlubang (data hilang)
         # akan bias rendah pada volume/volatilitas.
-        expected = int(TIMEFRAME_DURATION[timeframe] / BASE_CANDLE)
         res = res[res["candle_volatility_count"] == expected].reset_index(drop=True)
         res["coin_symbol"] = sym
         res["max_volatility"] = np.maximum(

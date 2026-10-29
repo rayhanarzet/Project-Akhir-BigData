@@ -56,7 +56,7 @@ def persist_closed_candle(quote: dict) -> None:
         "number_of_trades", "taker_buy_base_volume", "taker_buy_quote_volume",
     )}
     row.update(timestamp=pd.to_datetime(quote["candle_time"], unit="ms", utc=True), coin_symbol=quote["symbol"])
-    before, after = save_clean_ohlcv(quote["symbol"], pd.DataFrame([row]))
+    before, after = save_clean_ohlcv(quote["symbol"], pd.DataFrame([row]), source="Binance WebSocket closed 5m")
     append_audit_logs([{
         "run_id": f"ws_{quote['symbol']}_{quote['candle_time']}",
         "timestamp": quote["received_at"],

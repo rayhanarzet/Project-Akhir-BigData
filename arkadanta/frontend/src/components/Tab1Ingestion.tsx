@@ -212,7 +212,7 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div className="text-right">
-              <p className="bd-card-category">Pipeline Controller Status</p>
+              <p className="bd-card-category">Ketersediaan dataset lokal</p>
               <h3 className="bd-card-title !text-xl">{baseline.pipeline_status}</h3>
             </div>
           </div>
@@ -257,6 +257,18 @@ export const Tab1Ingestion: React.FC<Props> = ({ baseline, onRefreshBaseline }) 
           </div>
         </div>
       </div>
+
+      {baseline.integration && (
+        <section className="bd-card mt-4" aria-label="Status integrasi">
+          <div className="bd-card-body text-xs space-y-2">
+            <p>Backend: {baseline.integration.backend} · Stream: {baseline.integration.stream}</p>
+            <p>NiFi: {baseline.integration.nifi.status} — {baseline.integration.nifi.detail}</p>
+            <p>HDFS: {baseline.integration.hdfs.status} · Berkas: {baseline.integration.hdfs.file_count ?? 'belum terukur'} — {baseline.integration.hdfs.detail}</p>
+            <p>Antrean: {baseline.integration.outbox.queued_files} berkas · Jurnal perlu dipulihkan: {baseline.integration.outbox.pending_recovery_batches}</p>
+            <p className="text-[#9a9a9a]">{baseline.integration.outbox.detail}</p>
+          </div>
+        </section>
+      )}
 
       {statusMessage && (
         <div role="status" aria-live="polite" className="bd-card !mb-6 border-l-4 !border-l-[#1d8cf8]">

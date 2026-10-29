@@ -29,5 +29,5 @@ def test_new_rows_only_and_partitioned_by_month():
     assert len(out) == 5
     assert out["timestamp"].is_unique
     partitions = {p.parent.relative_to(storage.NIFI_OUTBOX_DIR).as_posix() for p in storage.NIFI_OUTBOX_DIR.rglob("*.csv")}
-    assert partitions == {"symbol=BTCUSDT/year=2026/month=09", "symbol=BTCUSDT/year=2026/month=10"}
+    assert partitions == {"v3/symbol=BTCUSDT/year=2026/month=09", "v3/symbol=BTCUSDT/year=2026/month=10"}
     assert not list(storage.NIFI_OUTBOX_DIR.rglob(".*"))  # tidak ada berkas sementara tertinggal

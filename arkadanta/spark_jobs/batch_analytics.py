@@ -10,6 +10,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from backend.config import DROP_ZONE_DIR
 from backend.schemas import DynamicConfig
+from backend.analytics.research_window import research_bounds
 from data.storage import load_clean_ohlcv
 from spark_jobs.locks import exclusive_spark
 from spark_jobs.train_models import collect_model_features
@@ -33,10 +34,9 @@ def _prepare_spark_features(config: DynamicConfig):
     try:
         raw = spark.read.csv(str(DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"), header=True, inferSchema=True)
         raw = raw.withColumn("timestamp", F.to_timestamp("timestamp"))
-        if config.start_date:
-            raw = raw.filter(F.col("timestamp") >= F.to_timestamp(F.lit(config.start_date)))
-        if config.end_date:
-            raw = raw.filter(F.col("timestamp") <= F.to_timestamp(F.lit(config.end_date)))
+        start, end = research_bounds(config.start_date, config.end_date)
+        raw = raw.filter(F.col("timestamp").between(F.to_timestamp(F.lit(start.isoformat())), F.to_timestamp(F.lit(end.isoformat()))))
+        raw = raw.filter(F.col("timestamp") + F.expr("INTERVAL 5 MINUTES") <= F.current_timestamp())
         aggregated = spark_aggregate_timeframe(raw, timeframe=config.timeframe)
         features = spark_compute_features(aggregated, ma_period=config.ma_period,
                                           rsi_period=config.rsi_period, rolling_window=config.rolling_window)

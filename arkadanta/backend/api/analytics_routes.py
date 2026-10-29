@@ -9,8 +9,8 @@ from backend.analytics.correlation_analyzer import (
     compute_historical_factor_attribution,
 )
 from backend.analytics.feature_engineering import compute_dynamic_features
-from backend.analytics.timeframe_aggregator import aggregate_timeframe
-from backend.config import DEFAULT_SYMBOLS
+from backend.analytics.timeframe_aggregator import aggregate_timeframe, TIMEFRAME_DURATION
+from backend.config import DEFAULT_SYMBOLS, DROP_ZONE_DIR
 from backend.schemas import DynamicConfig
 from data.storage import ResearchDataError, load_clean_ohlcv
 
@@ -63,7 +63,7 @@ def run_dynamic_analytics(config: DynamicConfig):
     )
 
     historical_attribution = compute_historical_factor_attribution(
-        df_anom, feature_cols=config.features, max_lag=min(config.max_lag, 6)
+        df_anom, feature_cols=config.features, max_lag=min(config.max_lag, 6), timeframe=config.timeframe
     )
 
     df_anom["timestamp"] = df_anom["timestamp"].astype(str)
@@ -97,11 +97,16 @@ def get_cross_asset_correlation(
     """Menghitung korelasi Pearson, rolling correlation, lag correlation, dan market-wide risk score."""
     frames = []
     for sym in DEFAULT_SYMBOLS:
+        if not (DROP_ZONE_DIR / f"{sym}_5m_clean.csv").exists():
+            continue
         df_5m = load_clean_ohlcv(sym)
         df_agg = aggregate_timeframe(df_5m, timeframe=timeframe)
         df_feat = compute_dynamic_features(df_agg, rolling_window=rolling_window)
+        if not df_feat.empty:
+            df_feat.loc[df_feat["timestamp"].diff().ne(TIMEFRAME_DURATION[timeframe]), "log_return"] = float("nan")
         frames.append(df_feat)
-
+    if not frames or base_symbol.upper() not in {str(f["coin_symbol"].iloc[0]) for f in frames if not f.empty} or target_symbol.upper() not in {str(f["coin_symbol"].iloc[0]) for f in frames if not f.empty}:
+        raise ResearchDataError("Data kedua aset korelasi belum tersedia pada timeframe ini. Ambil histori kedua aset terlebih dahulu.")
     df_multi = pd.concat(frames, ignore_index=True)
     return analyze_cross_asset_correlation(
         df_multi,
@@ -109,4 +114,5 @@ def get_cross_asset_correlation(
         target_symbol=target_symbol.upper(),
         rolling_window=rolling_window,
         max_lag=max_lag,
+        timeframe=timeframe,
     )

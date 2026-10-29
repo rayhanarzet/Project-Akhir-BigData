@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "ArkadantaCandleV3",
+  "fields": [
+    {"name": "timestamp", "type": "string"},
+    {"name": "coin_symbol", "type": "string"},
+    {"name": "open", "type": "double"},
+    {"name": "high", "type": "double"},
+    {"name": "low", "type": "double"},
+    {"name": "close", "type": "double"},
+    {"name": "volume", "type": "double"},
+    {"name": "quote_asset_volume", "type": ["null", "double"], "default": null},
+    {"name": "number_of_trades", "type": ["null", "double"], "default": null},
+    {"name": "taker_buy_base_volume", "type": ["null", "double"], "default": null},
+    {"name": "taker_buy_quote_volume", "type": ["null", "double"], "default": null},
+    {"name": "ingestion_version", "type": "long"},
+    {"name": "ingested_at", "type": "string"},
+    {"name": "source_name", "type": "string"}
+  ]
+}

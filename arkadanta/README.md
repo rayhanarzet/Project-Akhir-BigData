@@ -12,7 +12,7 @@ Aplikasi tidak lagi membuat dataset sintetis saat startup, membaca data, atau ke
 
 - Data aktif: `data/research/drop_zone/`.
 - Model aktif: `data/research/models/`.
-- Audit aktif: `data/research/audit_logs.json`.
+- Audit lengkap: `data/research/audit_logs.jsonl`; snapshot terbaru: `data/research/audit_logs.json`.
 - Data, model, dan audit lama di `data/drop_zone/`, `data/models/`, dan `data/audit_logs.json` tetap disimpan tetapi tidak digunakan otomatis karena asal datanya belum terverifikasi.
 - Cadangan lokal sebelum perubahan: `../backups/before-research-20261024-150944/data/`. Cadangan dan data penelitian tidak dimasukkan ke Git.
 - `data/sample_generator.py` hanya menyediakan generator untuk tes eksplisit; tes backend menggunakan direktori sementara.
@@ -75,7 +75,13 @@ python -m unittest discover -s arkadanta/tests -p test_market_stream.py -v
 
 Parameter API/UI sekarang: `gmm_components`, `gb_max_iter`, `gb_max_depth`, `gb_learning_rate`, dan `target_horizon`. Nama lama `cluster_k`, `rf_num_trees`, `rf_max_depth`, serta metode anomali `kmeans` ditolak agar tidak diabaikan diam-diam. Metode anomali pengganti adalah `gmm` dengan skor negative log-likelihood. Metrik kelompok dikirim sebagai `gmm_metrics`; prediksi memakai `current_component_id`.
 
-Artefak baru disimpan di `data/research/models/gmm_hgb_v2/`, terpisah dari model lama. Setelah restart backend, latih ulang melalui **Model Lab → Train & Evaluate Models**. Pilih timeframe dengan data nyata yang cukup; minimal 30 + horizon candle dan setidaknya dua kelas pada data latih. Model/matriks fitur disimpan bersama konfigurasi indikator agar inferensi menggunakan parameter yang sama. Hanya satu training berjalan sekaligus; permintaan kedua mendapat 429.
+Artefak baru disimpan di `data/research/models/gmm_hgb_v3/`, terpisah dari model lama. Setelah restart backend, latih ulang melalui **Model Lab → Train & Evaluate Models**. Pilih timeframe dengan data nyata yang cukup; minimal 30 + horizon candle dan setidaknya dua kelas pada data latih. Model/matriks fitur disimpan bersama konfigurasi indikator agar inferensi menggunakan parameter yang sama. Hanya satu training berjalan sekaligus; permintaan kedua mendapat 429.
+
+**Integritas v3:** perubahan candle dijurnal sebelum CSV/outbox diperbarui dan dipulihkan saat startup/read/write berikutnya. Koreksi timestamp lama juga dikirim dengan `ingestion_version` baru. Outbox memakai skema tetap di `nifi_outbox/v3/`; NiFi wajib memakai PutHDFS `Conflict Resolution Strategy = ignore` agar replay berkas event yang sama aman. Riwayat audit lengkap berada di `audit_logs.jsonl`; JSON lama tetap menjadi snapshot kompatibilitas. Lihat [migrasi dan startup](../START.md) serta [penggabungan berkas NiFi](nifi/README.md).
+
+Upload/REST/stream hanya menyimpan OHLCV finite, lengkap, di grid 5 menit, dan sudah selesai. Tidak ada forward-fill OHLC atau penggantian volume hilang dengan nol. Semua jalur analisis/training membatasi penelitian pada 365 hari terakhir tanpa menghapus arsip. Target training harus tepat T+horizon menurut timestamp; pasangan yang melewati celah dibuang. Prediksi menolak candle yang bukan bucket tertutup terakhir dan menyertakan `target_start`/`target_end` UTC.
+
+SAFE/WARNING/DANGER adalah kategori relatif GMM. Metrik klasifikasi bukan ukuran keamanan investasi. Evaluasi tambahan `volatility_event_validation` memakai kejadian range aktual candle target di atas persentil 95 target latih; `walk_forward_volatility` mengevaluasi regressor pada hingga tiga periode uji kronologis. Batas harga pada dashboard adalah ilustrasi harga ± estimasi range, bukan resistance teknikal atau stop loss tervalidasi; field API `resistance_level`/`stop_loss_level` dipertahankan sebagai alias kompatibilitas.
 
 **Jalur Spark:** agregasi/feature engineering memakai PySpark, kemudian fitur dikumpulkan ke driver untuk trainer GMM/HGB yang sama, dengan batas 500.000 baris. HistGradientBoosting tidak tersedia di Spark MLlib; pelatihan ini **bukan training terdistribusi**. Rumus fitur Spark dan pandas identik (diuji `tests/test_spark_parity.py`; RSI memakai rata-rata sederhana di keduanya, `ema_20` hanya tersedia di pandas), sehingga model hasil Spark dilayani dengan fitur pandas tanpa menyalakan Spark per prediksi. Hanya satu job Spark berjalan per backend; job kedua ditolak (429/400). Memilih Spark membutuhkan Java/PySpark yang berfungsi; `JAVA_HOME` yang salah langsung ditolak, bukan menggantung.
 
@@ -118,7 +124,7 @@ arkadanta/
       risk_labeler.py           # StandardScaler + Gaussian Mixture + pengurutan skor risiko centroid (SAFE/WARNING/DANGER)
       model_trainer.py          # Temporal split + HistGradientBoosting Classifier & Regressor (T+1)
       model_evaluator.py        # Silhouette, Accuracy, Precision, Recall, F1, Confusion Matrix, MAE, RMSE
-      model_predictor.py        # Inferensi T+1 + estimasi Resistance & Stop Loss
+      model_predictor.py        # Inferensi T+1 + periode target UTC dan batas ilustratif
   spark_jobs/                   # PySpark Batch Layer
     batch_analytics.py
     dynamic_aggregation.py
@@ -141,7 +147,8 @@ arkadanta/
     research/
       drop_zone/                # Data OHLCV penelitian aktif
       models/                   # Model penelitian aktif
-      audit_logs.json           # Audit penelitian aktif
+      audit_logs.jsonl          # Riwayat audit penelitian lengkap
+      audit_logs.json           # Snapshot 50 catatan terbaru
     drop_zone/                  # Data lama, tidak dibaca otomatis
 ```
 
@@ -153,11 +160,11 @@ arkadanta/
 
 Batch layer membaca HDFS dari salah satu dari dua sumber:
 
-- **raw** (`/arkadanta/raw`): dump histori Binance yang dimasukkan NiFi.
-- **clean** (`/user/arkadanta/data/clean/crypto/symbol=<S>/year=<Y>/month=<M>/`):
+- **raw** (`/arkadanta/raw/symbol=<S>/`): dump histori Binance, terpisah per aset.
+- **clean** (`/user/arkadanta/data/clean/crypto/v3/symbol=<S>/year=<Y>/month=<M>/`):
   setiap baris baru aplikasi (upload, sync, backfill, candle live) ditulis ke
   `data/research/nifi_outbox/`, lalu NiFi `GetFile → UpdateAttribute → PutHDFS`
-  mengirimnya (lihat `START.md` bagian 12).
+  mengirimnya (lihat `START.md` bagian B). Spark memilih revisi terbesar per simbol/timestamp, menolak konflik pada revisi sama, dan memisahkan data v3 dari skema lama.
 
 PySpark mengolah agregasi dan fitur. GMM + HistGradientBoosting dilatih di driver
 dengan trainer yang sama seperti Model Lab, dan bundle-nya disimpan ke
@@ -176,7 +183,7 @@ Kemudian buka dashboard React dan pilih **Historical HDFS Batch**, atau gunakan
 tanggal (maksimum 365 hari), serta `source` (`raw` atau `clean`). Job menerima format Binance
 Kline standar 12 kolom tanpa header maupun CSV ber-header
 `timestamp, open, high, low, close, volume`. `coin_symbol` opsional untuk file
-yang hanya berisi satu aset; jika tidak ada, simbol diambil dari pilihan aset.
+yang hanya berisi satu aset; jika tidak ada, identitas wajib berasal dari partisi `symbol=<S>` atau nama file `<S>-5m-*.csv`, bukan diberikan dari pilihan dashboard.
 Hasil API menunjukkan path input, rentang timestamp yang benar-benar terbaca,
 metrik evaluasi, serta lokasi output dan model.
 

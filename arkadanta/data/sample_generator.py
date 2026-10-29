@@ -25,6 +25,7 @@ def generate_synthetic_5m_ohlcv(
     end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
     end_minute = (end_time.minute // 5) * 5
     end_time = end_time.replace(minute=end_minute)
+    end_time -= timedelta(minutes=5)  # Seluruh fixture merupakan candle yang sudah selesai.
     timestamps = [
         end_time - timedelta(minutes=5 * (n_candles - 1 - i))
         for i in range(n_candles)

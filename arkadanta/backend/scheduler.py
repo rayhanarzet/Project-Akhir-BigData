@@ -150,7 +150,7 @@ class BinanceCronScheduler:
                 frame = _fetch_since(symbol, int((time.time() - days * 86400) * 1000))
                 if frame.empty:
                     raise ValueError(f"Binance tidak mengembalikan histori untuk {symbol}")
-                rows_before, rows_after = save_clean_ohlcv(symbol, frame)
+                rows_before, rows_after = save_clean_ohlcv(symbol, frame, source=f"Binance REST backfill {days}d")
                 reports.append(IngestionAuditReport(
                     run_id=f"backfill_{uuid.uuid4().hex[:8]}",
                     timestamp=datetime.now(timezone.utc).isoformat(),
@@ -179,7 +179,7 @@ class BinanceCronScheduler:
                 return 0  # belum ada histori sama sekali: itu tugas Backfill Histori, bukan pengisian celah
             frame = _fetch_since(symbol, int(last.value // 1_000_000) + FIVE_MINUTES_MS)
             if not frame.empty:
-                save_clean_ohlcv(symbol, frame)
+                save_clean_ohlcv(symbol, frame, source="Binance REST gap recovery")
             return len(frame)
 
     def _trigger_sync(self, symbols: Optional[List[str]], limit: Optional[int]) -> List[Dict[str, Any]]:
@@ -205,7 +205,7 @@ class BinanceCronScheduler:
                 raise ValueError(f"Binance {symbol}: {exc}. {len(synced_reports)} aset sudah tersimpan; aset yang gagal tidak diubah") from exc
 
             existing_path = DROP_ZONE_DIR / f"{symbol}_5m_clean.csv"
-            rows_before, rows_after = save_clean_ohlcv(symbol, df_new)
+            rows_before, rows_after = save_clean_ohlcv(symbol, df_new, source="Binance REST live sync")
             dups = max(0, rows_before - rows_after)
 
             rep = IngestionAuditReport(

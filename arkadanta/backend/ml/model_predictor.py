@@ -1,6 +1,6 @@
-"""[ORANG 2] Inferensi T+1 untuk kelas risiko (SAFE/WARNING/DANGER), estimasi volatilitas, Resistance, dan Stop Loss (Bab 5.6)."""
+"""Inferensi kategori gejolak relatif T+1, periode target UTC, dan batas harga ilustratif."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 from typing import Any, Dict
 import joblib
@@ -30,7 +30,7 @@ def load_or_train_bundle(symbol: str = "BTCUSDT", timeframe: str = "1h") -> Dict
 
 
 def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
-    """Menghasilkan prediksi rezim risiko T+1, probabilitas kelas, estimasi volatilitas T+1, Resistance, dan Stop Loss."""
+    """Menghasilkan prediksi kategori/range T+1, dengan waktu target dan batas ilustratif."""
     symbol = req.symbol.upper()
     bundle = load_or_train_bundle(symbol=symbol, timeframe=req.timeframe)
 
@@ -48,11 +48,15 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
     df_agg = aggregate_timeframe(load_clean_ohlcv(symbol), timeframe=req.timeframe)
     df_feat = compute_dynamic_features(df_agg, ma_period=config.ma_period,
                                       rsi_period=config.rsi_period, rolling_window=config.rolling_window)
+    if df_feat.empty:
+        raise ResearchDataError("Belum ada candle lengkap dalam 365 hari terakhir pada timeframe ini. Jalankan Backfill Histori.")
     latest_row = df_feat.sort_values("timestamp").iloc[-1].copy()
     # Candle lengkap terakhir normalnya selesai < 1 periode lalu; lebih tua berarti ada data yang terlewat.
     duration = TIMEFRAME_DURATION.get(req.timeframe, BASE_CANDLE)
     candle_end = pd.Timestamp(latest_row["timestamp"]) + duration
-    if datetime.now(timezone.utc) - candle_end > duration + timedelta(minutes=30):
+    clock = pd.Timestamp.now(tz="UTC")
+    # Candle T harus merupakan bucket tertutup paling akhir, bukan sekadar "cukup baru".
+    if clock >= candle_end + duration:
         raise ResearchDataError(
             f"Candle {req.timeframe} lengkap terakhir selesai {candle_end:%Y-%m-%d %H:%M} UTC; data setelahnya hilang. "
             "Jalankan Manual Sync atau Backfill Histori agar prediksi memakai data terbaru."
@@ -63,7 +67,10 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
             if k in latest_row.index:
                 latest_row[k] = float(v)
 
-    x_vec = np.array([[float(latest_row.get(col, 0.0)) for col in feature_cols]])
+    missing = set(feature_cols) - set(latest_row.index)
+    if missing:
+        raise ResearchDataError(f"Sumber fitur prediksi tidak tersedia: {sorted(missing)}. Lengkapi data atau latih ulang dengan fitur yang tersedia.")
+    x_vec = np.array([[float(latest_row[col]) for col in feature_cols]])
 
     if not np.isfinite(x_vec).all():
         raise ResearchDataError("Fitur prediksi mengandung nilai tidak valid.")
@@ -89,10 +96,14 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
     estimated_volatility_price = current_price * pred_vol_ratio
     resistance_level = current_price + estimated_volatility_price
     stop_loss_level = max(current_price - estimated_volatility_price, 0.0)
+    target_start = candle_end + duration * (req.target_horizon - 1)
+    target_end = target_start + duration
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "candle_timestamp": str(latest_row["timestamp"]),
+        "target_start": target_start.isoformat(), "target_end": target_end.isoformat(),
+        "model_trained_at": meta["trained_at"],
         "symbol": symbol,
         "timeframe": req.timeframe,
         "target_horizon": req.target_horizon,
@@ -105,6 +116,10 @@ def predict_next_period(req: PredictRequest) -> Dict[str, Any]:
         "estimated_volatility_nominal": round(estimated_volatility_price, 6),
         "resistance_level": round(resistance_level, 6),
         "stop_loss_level": round(stop_loss_level, 6),
+        "illustrative_upper_bound": round(resistance_level, 6),
+        "illustrative_lower_bound": round(stop_loss_level, 6),
+        "bounds_definition": "Harga penutupan T +/- harga T x estimasi range target; batas ilustratif, tanpa jaminan cakupan harga.",
+        "risk_label_definition": meta["risk_label_definition"],
         "feature_snapshot": {
             col: round(float(latest_row.get(col, 0.0)), 6) for col in feature_cols
         },

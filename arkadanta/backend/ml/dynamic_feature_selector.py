@@ -26,10 +26,9 @@ def select_and_prepare_features(
 
     clean_df = df.copy()
     for col in valid_cols:
-        clean_df[col] = (
-            pd.to_numeric(clean_df[col], errors="coerce")
-            .replace([np.inf, -np.inf], 0.0)
-            .fillna(0.0)
-        )
+        values = pd.to_numeric(clean_df[col], errors="coerce")
+        if not np.isfinite(values.to_numpy(dtype=float)).all():
+            raise ValueError(f"Fitur {col} mengandung NaN/Inf atau nilai nonnumerik; periksa data sumber.")
+        clean_df[col] = values
 
     return clean_df, valid_cols

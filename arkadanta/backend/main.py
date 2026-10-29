@@ -1,6 +1,7 @@
 """FastAPI Server Utama Arkadanta (Serving Layer - Bab 3.3)."""
 
 import sys
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,7 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from data.storage import ResearchDataError
+from data.storage import ResearchDataError, recover_pending_writes
 
 from backend.api.analytics_routes import router as analytics_router
 from backend.api.ingestion_routes import router as ingestion_router
@@ -25,6 +26,7 @@ from backend.config import AVAILABLE_FEATURES, CORS_ORIGINS, DEFAULT_SYMBOLS, SU
 
 @asynccontextmanager
 async def lifespan(app):
+    await asyncio.to_thread(recover_pending_writes)
     yield
     await market_stream.stop()
 

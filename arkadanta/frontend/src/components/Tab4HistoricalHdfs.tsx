@@ -78,7 +78,7 @@ export const Tab4HistoricalHdfs: React.FC = () => {
           </label>
           <label className="text-xs text-white/70">Sumber HDFS
             <select value={source} onChange={(e) => setSource(e.target.value as 'raw' | 'clean')} className="mt-1 w-full rounded border border-white/15 bg-[#1e1e2f] p-2 text-sm text-white">
-              <option value="raw">Raw — dump historis Binance (/arkadanta/raw)</option>
+              <option value="raw">Raw — dump Binance per partisi /arkadanta/raw/symbol=ASET</option>
               <option value="clean">Clean — data aplikasi via NiFi outbox</option>
             </select>
           </label>

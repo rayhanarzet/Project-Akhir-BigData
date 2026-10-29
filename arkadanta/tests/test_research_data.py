@@ -31,6 +31,7 @@ class ResearchDataTests(unittest.TestCase):
         self.stack.enter_context(patch.object(storage, "AUDIT_LOG_PATH", self.directory / "audit.json"))
         self.stack.enter_context(patch.object(storage, "NIFI_OUTBOX_DIR", self.directory / "nifi_outbox"))
         self.worker = scheduler.BinanceCronScheduler()
+        self.stack.enter_context(patch.object(ingestion_routes, "get_integration_status", return_value={"backend": "UP"}))
         self.stack.enter_context(patch.object(ingestion_routes, "cron_scheduler", self.worker))
 
     def write_csv(self):
@@ -113,7 +114,7 @@ class ResearchDataTests(unittest.TestCase):
         def kline(open_ms):
             return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + 299_999, "15", 3, "4", "6", "0"]
 
-        start = 1_700_000_000_000
+        start = (1_700_000_000_000 // 300_000) * 300_000
         full = Mock()
         full.json.return_value = [kline(start + i * 300_000) for i in range(1000)]
         short = Mock()
@@ -131,7 +132,7 @@ class ResearchDataTests(unittest.TestCase):
             return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + 299_999, "15", 3, "4", "6", "0"]
 
         self.assertEqual(self.worker.fill_gap("BTCUSDT"), 0)  # belum ada histori: tidak menyentuh jaringan
-        last = 1_700_000_000_000
+        last = (1_700_000_000_000 // 300_000) * 300_000
         page = Mock()
         page.json.return_value = [kline(last), kline(last + 300_000)]
         with patch.object(scheduler.requests, "get", return_value=page):
@@ -154,7 +155,7 @@ class ResearchDataTests(unittest.TestCase):
         dynamic_pipeline.run_dynamic_ingestion_pipeline("real.csv", content)
         baseline = ingestion_routes.get_historical_baseline()
         self.assertEqual([asset["symbol"] for asset in baseline["assets"]], ["BTCUSDT"])
-        self.assertEqual(len(list(self.drop_zone.iterdir())), 1)
+        self.assertEqual(len(list(self.drop_zone.glob("*.csv"))), 1)
 
 
 if __name__ == "__main__":
